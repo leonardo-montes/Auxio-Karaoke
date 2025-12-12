@@ -100,7 +100,8 @@ constructor(
                 library.albums.size,
                 library.artists.size,
                 library.genres.size,
-                library.songs.sumOf { it.durationMs })
+                library.songs.sumOf { it.durationMs },
+                library.songs.sumOf { it.size })
         L.d("Updated statistics: ${_statistics.value}")
     }
 
@@ -362,7 +363,8 @@ constructor(
         val albums: Int,
         val artists: Int,
         val genres: Int,
-        val durationMs: Long
+        val durationMs: Long,
+        val totalSizeBytes: Long
     )
 }
 
