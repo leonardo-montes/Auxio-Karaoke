@@ -83,9 +83,11 @@ class QueueBottomSheetBehavior<V : View>(context: Context, attributeSet: Attribu
     override fun applyWindowInsets(child: View, insets: WindowInsets): WindowInsets {
         super.applyWindowInsets(child, insets)
         // Offset our expanded panel by the size of the playback bar, as that is shown when
-        // we slide up the panel.
+        // we slide up the panel. Use ideal bar height as fallback when the bar hasn't been
+        // measured yet (can occur when window insets are applied before onDependentViewChanged).
         val bars = insets.systemBarInsetsCompat
-        expandedOffset = barHeight + barSpacing
+        val effectiveBarHeight = if (barHeight > 0) barHeight else getIdealBarHeight(child.context)
+        expandedOffset = effectiveBarHeight + barSpacing
         return insets.replaceSystemBarInsetsCompat(
             bars.left, bars.top, bars.right, expandedOffset + bars.bottom)
     }
