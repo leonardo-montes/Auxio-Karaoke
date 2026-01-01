@@ -72,7 +72,9 @@ typealias Sugar = Bundle.(Context) -> Unit
 
 fun header(@StringRes nameRes: Int): Sugar = {
     putString(
-        MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE, it.getString(nameRes))
+        MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE,
+        it.getString(nameRes),
+    )
 }
 
 fun header(name: String): Sugar = {
@@ -95,7 +97,8 @@ fun TabNode.toMediaItem(context: Context): MediaItem {
     val extras =
         makeExtras(
             context,
-            style(MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_CATEGORY_LIST_ITEM))
+            style(MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_CATEGORY_LIST_ITEM),
+        )
     val mediaSessionUID = MediaSessionUID.Tab(this)
     val description =
         MediaDescriptionCompat.Builder()
@@ -140,7 +143,8 @@ fun Album.toMediaItem(context: Context, vararg sugar: Sugar): MediaItem {
             .setIconUri(
                 covers.covers.firstOrNull()?.let {
                     Uri.withAppendedPath(CoverProvider.CONTENT_URI, it.id)
-                })
+                }
+            )
             .setExtras(extras)
             .build()
     return MediaItem(description, MediaItem.FLAG_BROWSABLE)
@@ -160,7 +164,8 @@ fun Artist.toMediaItem(context: Context, vararg sugar: Sugar): MediaItem {
                 context.getPlural(R.plurals.fmt_song_count, songs.size)
             } else {
                 context.getString(R.string.def_song_count)
-            })
+            },
+        )
     val extras = makeExtras(context, *sugar)
     val description =
         MediaDescriptionCompat.Builder()
@@ -171,7 +176,8 @@ fun Artist.toMediaItem(context: Context, vararg sugar: Sugar): MediaItem {
             .setIconUri(
                 covers.covers.firstOrNull()?.let {
                     Uri.withAppendedPath(CoverProvider.CONTENT_URI, it.id)
-                })
+                }
+            )
             .setExtras(extras)
             .build()
     return MediaItem(description, MediaItem.FLAG_BROWSABLE)
@@ -194,7 +200,8 @@ fun Genre.toMediaItem(context: Context, vararg sugar: Sugar): MediaItem {
             .setIconUri(
                 covers.covers.firstOrNull()?.let {
                     Uri.withAppendedPath(CoverProvider.CONTENT_URI, it.id)
-                })
+                }
+            )
             .setExtras(extras)
             .build()
     return MediaItem(description, MediaItem.FLAG_BROWSABLE)
@@ -218,7 +225,8 @@ fun Playlist.toMediaItem(context: Context, vararg sugar: Sugar): MediaItem {
             .setIconUri(
                 covers.covers.firstOrNull()?.let {
                     Uri.withAppendedPath(CoverProvider.CONTENT_URI, it.id)
-                })
+                }
+            )
             .setExtras(extras)
             .build()
     return MediaItem(description, MediaItem.FLAG_BROWSABLE)

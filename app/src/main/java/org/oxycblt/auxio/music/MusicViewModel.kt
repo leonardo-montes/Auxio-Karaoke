@@ -53,7 +53,7 @@ class MusicViewModel
 constructor(
     @ApplicationContext context: Context,
     private val listSettings: ListSettings,
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
 ) : ViewModel(), MusicRepository.UpdateListener, MusicRepository.IndexingListener {
     private val externalPlaylistManager = ExternalPlaylistManager.from(context)
 
@@ -132,7 +132,7 @@ constructor(
     fun createPlaylist(
         name: String? = null,
         songs: List<Song> = listOf(),
-        reason: PlaylistDecision.New.Reason = PlaylistDecision.New.Reason.NEW
+        reason: PlaylistDecision.New.Reason = PlaylistDecision.New.Reason.NEW,
     ) {
         if (name != null) {
             L.d("Creating $name with ${songs.size} songs]")
@@ -190,7 +190,9 @@ constructor(
                                 target,
                                 importedPlaylist.name,
                                 songs,
-                                PlaylistDecision.Rename.Reason.IMPORT))
+                                PlaylistDecision.Rename.Reason.IMPORT,
+                            )
+                        )
                     } else {
                         musicRepository.rewritePlaylist(target, songs)
                         _playlistMessage.put(PlaylistMessage.ImportSuccess)
@@ -198,7 +200,11 @@ constructor(
                 } else {
                     _playlistDecision.put(
                         PlaylistDecision.New(
-                            songs, importedPlaylist.name, PlaylistDecision.New.Reason.IMPORT))
+                            songs,
+                            importedPlaylist.name,
+                            PlaylistDecision.New.Reason.IMPORT,
+                        )
+                    )
                 }
             }
         } else {
@@ -243,7 +249,7 @@ constructor(
         playlist: Playlist,
         name: String? = null,
         applySongs: List<Song> = listOf(),
-        reason: PlaylistDecision.Rename.Reason = PlaylistDecision.Rename.Reason.ACTION
+        reason: PlaylistDecision.Rename.Reason = PlaylistDecision.Rename.Reason.ACTION,
     ) {
         if (name != null) {
             L.d("Renaming $playlist to $name")
@@ -388,7 +394,7 @@ sealed interface PlaylistDecision {
         enum class Reason {
             NEW,
             ADD,
-            IMPORT
+            IMPORT,
         }
     }
 
@@ -409,11 +415,11 @@ sealed interface PlaylistDecision {
         val playlist: Playlist,
         val template: String?,
         val applySongs: List<Song>,
-        val reason: Reason
+        val reason: Reason,
     ) : PlaylistDecision {
         enum class Reason {
             ACTION,
-            IMPORT
+            IMPORT,
         }
     }
 

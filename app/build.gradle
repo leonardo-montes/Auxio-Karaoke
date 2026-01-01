@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id "com.android.application"
     id "kotlin-android"
@@ -10,9 +12,9 @@ plugins {
 }
 
 android {
-    compileSdk target_sdk
     // Auxio implicitly depends on the native modules, explicitly specify it
     // here so the libraries are still stripped.
+    compileSdk target_sdk
     ndkVersion ndk_version
     namespace "org.oxycblt.auxio"
 
@@ -31,11 +33,6 @@ android {
         coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += "-Xjvm-default=all"
     }
 
     buildTypes {
@@ -71,6 +68,13 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+        freeCompilerArgs.add("-Xjvm-default=all")
+    }
+}
+
 dependencies {
     // Kotlin
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
@@ -85,7 +89,7 @@ dependencies {
     // General
     implementation "androidx.core:core-ktx:$core_version"
     implementation "androidx.appcompat:appcompat:1.7.1"
-    implementation "androidx.activity:activity-ktx:1.10.1"
+    implementation "androidx.activity:activity-ktx:1.12.2"
     // noinspection GradleDependency
     implementation "androidx.fragment:fragment-ktx:1.6.2"
 
@@ -101,7 +105,7 @@ dependencies {
     implementation "androidx.viewpager2:viewpager2:1.0.0"
 
     // Lifecycle
-    def lifecycle_version = "2.9.2"
+    def lifecycle_version = "2.10.0"
     implementation "androidx.lifecycle:lifecycle-common:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
@@ -112,7 +116,7 @@ dependencies {
     implementation "androidx.navigation:navigation-fragment-ktx:$navigation_version"
 
     // Media
-    implementation "androidx.media:media:1.7.0"
+    implementation "androidx.media:media:1.7.1"
 
     // Android Auto
     implementation "androidx.car.app:app:1.7.0"
@@ -145,7 +149,7 @@ dependencies {
     // Material
     // TODO: Exactly figure out the conditions that the 1.7.0 ripple bug occurred so you can just
     //  PR a fix.
-    implementation "com.google.android.material:material:1.13.0-beta01"
+    implementation "com.google.android.material:material:1.13.0"
 
     // Dependency Injection
     implementation "com.google.dagger:dagger:$hilt_version"
@@ -163,5 +167,5 @@ dependencies {
     implementation 'com.joaomgcd:taskerpluginlibrary:0.4.10'
 
     // Fuzzy search
-    implementation 'org.apache.commons:commons-text:1.14.0'
+    implementation 'org.apache.commons:commons-text:1.15.0'
 }

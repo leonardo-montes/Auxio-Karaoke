@@ -104,6 +104,8 @@ class AboutFragment : ViewBindingFragment<FragmentAboutBinding>() {
             getString(
                 R.string.fmt_lib_total_size,
                 (statistics?.totalSizeBytes ?: 0L).formatFileSize())
+                (statistics?.durationMs ?: 0).formatDurationMs(false),
+            )
     }
 
     private fun Context.sendEmail(recipient: String) {

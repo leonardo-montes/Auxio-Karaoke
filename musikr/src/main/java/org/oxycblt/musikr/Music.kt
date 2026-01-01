@@ -78,7 +78,7 @@ sealed interface Music {
     private constructor(
         private val format: Format,
         private val item: Item,
-        private val uuid: UUID
+        private val uuid: UUID,
     ) : Parcelable {
         // Cache the hashCode for HashMap efficiency.
         @IgnoredOnParcel private var hashCode = format.hashCode()
@@ -103,7 +103,7 @@ sealed interface Music {
             ALBUM(0xA10A),
             ARTIST(0xA109),
             GENRE(0xA108),
-            PLAYLIST(0xA107)
+            PLAYLIST(0xA107),
         }
 
         /**
@@ -116,7 +116,7 @@ sealed interface Music {
             AUXIO("org.oxycblt.auxio"),
 
             /** @see musicBrainz */
-            MUSICBRAINZ("org.musicbrainz")
+            MUSICBRAINZ("org.musicbrainz"),
         }
 
         object TypeConverters {
@@ -177,7 +177,8 @@ sealed interface Music {
                             .or(digest[12].toLong().and(0xFF).shl(24))
                             .or(digest[13].toLong().and(0xFF).shl(16))
                             .or(digest[14].toLong().and(0xFF).shl(8))
-                            .or(digest[15].toLong().and(0xFF)))
+                            .or(digest[15].toLong().and(0xFF)),
+                    )
                 return UID(Format.AUXIO, item, uuid)
             }
 
