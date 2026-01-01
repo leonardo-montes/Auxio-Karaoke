@@ -36,9 +36,9 @@ import org.oxycblt.auxio.playback.formatDurationMs
 import org.oxycblt.auxio.ui.ViewBindingFragment
 import org.oxycblt.auxio.util.collectImmediately
 import org.oxycblt.auxio.util.openInBrowser
-import org.oxycblt.auxio.util.formatFileSize
 import org.oxycblt.auxio.util.startIntent
 import org.oxycblt.auxio.util.systemBarInsetsCompat
+import android.text.format.Formatter
 
 /**
  * A [ViewBindingFragment] that displays information about the app and the current music library.
@@ -103,9 +103,7 @@ class AboutFragment : ViewBindingFragment<FragmentAboutBinding>() {
         binding.aboutTotalSize.text =
             getString(
                 R.string.fmt_lib_total_size,
-                (statistics?.totalSizeBytes ?: 0L).formatFileSize())
-                (statistics?.durationMs ?: 0).formatDurationMs(false),
-            )
+                Formatter.formatFileSize(context, statistics?.totalSizeBytes ?: 0L))
     }
 
     private fun Context.sendEmail(recipient: String) {
