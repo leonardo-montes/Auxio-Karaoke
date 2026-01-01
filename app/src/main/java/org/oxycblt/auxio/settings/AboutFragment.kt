@@ -97,7 +97,8 @@ class AboutFragment : ViewBindingFragment<FragmentAboutBinding>() {
         binding.aboutTotalDuration.text =
             getString(
                 R.string.fmt_lib_total_duration,
-                (statistics?.durationMs ?: 0).formatDurationMs(false))
+                (statistics?.durationMs ?: 0).formatDurationMs(false),
+            )
     }
 
     private fun Context.sendEmail(recipient: String) {
