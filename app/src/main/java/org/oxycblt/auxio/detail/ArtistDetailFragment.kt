@@ -45,6 +45,7 @@ import org.oxycblt.musikr.Artist
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Song
+import org.oxycblt.musikr.tag.Name
 import timber.log.Timber as L
 
 /**
@@ -147,9 +148,13 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
 
         if (artist.songs.isNotEmpty()) {
             // Information about the artist's genre(s) map to the sub-head text
+            // Hide the subhead if all genres are unknown (no genre tags in music files)
+            val hasKnownGenres = artist.genres.any { it.name is Name.Known }
             binding.detailSubhead.apply {
-                isVisible = true
-                text = artist.genres.resolveNames(context)
+                isVisible = hasKnownGenres
+                if (hasKnownGenres) {
+                    text = artist.genres.resolveNames(context)
+                }
             }
 
             // In the case that this header used to he configured to have no songs,
