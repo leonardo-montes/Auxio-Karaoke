@@ -32,13 +32,9 @@ private data object TagParserImpl : TagParser {
     override fun parse(metadata: Metadata): ParsedTags {
         val compilation = metadata.isCompilation()
         val artistMusicBrainzIds =
-            metadata.artistMusicBrainzIds()
-                ?: metadata.composerMusicBrainzIds()
-                ?: listOf()
-        val artistNames =
-            metadata.artistNames() ?: metadata.composerNames() ?: listOf()
-        val artistSortNames =
-            metadata.artistSortNames() ?: metadata.composerSortNames() ?: listOf()
+            metadata.artistMusicBrainzIds() ?: metadata.composerMusicBrainzIds() ?: listOf()
+        val artistNames = metadata.artistNames() ?: metadata.composerNames() ?: listOf()
+        val artistSortNames = metadata.artistSortNames() ?: metadata.composerSortNames() ?: listOf()
         return ParsedTags(
             durationMs = metadata.properties.durationMs,
             replayGainTrackAdjustment = metadata.replayGainTrackAdjustment(),

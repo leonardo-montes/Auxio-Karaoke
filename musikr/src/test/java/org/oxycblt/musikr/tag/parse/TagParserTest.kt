@@ -160,7 +160,9 @@ class TagParserTest {
                     mapOf(
                         "TCOM" to listOf("Composer Artist"),
                         "TSOC" to listOf("Composer Artist Sort"),
-                        "TXXX:MUSICBRAINZ COMPOSER ID" to listOf("composer-artist-mbid")))
+                        "TXXX:MUSICBRAINZ COMPOSER ID" to listOf("composer-artist-mbid"),
+                    )
+            )
 
         val tags = tagParser.parse(metadata)
 
