@@ -97,6 +97,15 @@ abstract class BaseBottomSheetBehavior<V : View>(context: Context, attributeSet:
         true
 
     override fun onLayoutChild(parent: CoordinatorLayout, child: V, layoutDirection: Int): Boolean {
+        // Pre-calculate peekHeight before the sheet is positioned by super.onLayoutChild().
+        // This ensures correct positioning during configuration changes (e.g., split-screen
+        // resize) where layout happens before insets are applied. Use the bar's measured
+        // height if available, otherwise fall back to the ideal height.
+        val bar = (child as ViewGroup).getChildAt(0)
+        val barHeight =
+            if (bar.measuredHeight > 0) bar.measuredHeight else getIdealBarHeight(child.context)
+        peekHeight = barHeight + idealBottomGestureInsets
+
         val layout = super.onLayoutChild(parent, child, layoutDirection)
         // Don't repeat redundant initialization.
         if (!initalized) {
@@ -109,7 +118,6 @@ abstract class BaseBottomSheetBehavior<V : View>(context: Context, attributeSet:
                 setOnApplyWindowInsetsListener(::applyWindowInsets)
             }
             initalized = true
-            peekHeight = getIdealBarHeight(child.context) + idealBottomGestureInsets
         }
         // Sometimes CoordinatorLayout doesn't dispatch window insets to us, likely due to how
         // much we overload it. Ensure that we get them.
