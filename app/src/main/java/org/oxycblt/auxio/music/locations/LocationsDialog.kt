@@ -401,7 +401,7 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                     context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
                 )
                 binding.locationsPermsSubtitle.setTextColor(
-                    context.getAttrColorCompat(MR.attr.colorSecondary)
+                    context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
                 )
                 binding.locationsPermsOpen.imageTintList =
                     context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
@@ -417,7 +417,7 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                         context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
                     )
                     binding.locationsPermsSubtitle.setTextColor(
-                        context.getAttrColorCompat(MR.attr.colorSecondary)
+                        context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
                     )
                     binding.locationsPermsOpen.imageTintList =
                         context.getAttrColorCompat(MR.attr.colorOnSecondaryContainer)
@@ -427,7 +427,7 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                         context.getAttrColorCompat(MR.attr.colorOnErrorContainer)
                     )
                     binding.locationsPermsSubtitle.setTextColor(
-                        context.getAttrColorCompat(androidx.appcompat.R.attr.colorError)
+                        context.getAttrColorCompat(MR.attr.colorOnErrorContainer)
                     )
                     binding.locationsPermsOpen.imageTintList =
                         context.getAttrColorCompat(MR.attr.colorOnErrorContainer)
