@@ -60,6 +60,8 @@ interface PlaybackSettings : Settings<PlaybackSettings.Listener> {
     val pauseOnRepeat: Boolean
     /** Whether to maintain the play/pause state when skipping or editing the queue */
     val rememberPause: Boolean
+    /** Whether to always exit when task is removed, even if playing. */
+    val exitOnTaskRemoval: Boolean
 
     interface Listener {
         /** Called when one of the ReplayGain configurations have changed. */
@@ -142,6 +144,9 @@ class PlaybackSettingsImpl @Inject constructor(@ApplicationContext context: Cont
 
     override val rememberPause: Boolean
         get() = sharedPreferences.getBoolean(getString(R.string.set_key_remember_pause), false)
+
+    override val exitOnTaskRemoval: Boolean
+        get() = sharedPreferences.getBoolean(getString(R.string.set_key_task_exit), false)
 
     override fun migrate() {
         // MusicMode was converted to PlaySong in 3.2.0

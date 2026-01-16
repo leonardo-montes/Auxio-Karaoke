@@ -260,6 +260,8 @@
     <string name="set_play_song_by_itself">Play song by itself</string>
     <string name="set_keep_shuffle">Remember shuffle</string>
     <string name="set_keep_shuffle_desc">Keep shuffle on when playing a new song</string>
+    <string name="set_task_exit">Always exit on close</string>
+    <string name="set_task_exit_desc">Stop playback when removed from recents, even if playing</string>
 
     <string name="set_content">Content</string>
     <string name="set_content_desc">Control how music and images are loaded</string>

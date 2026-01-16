@@ -41,6 +41,7 @@ private constructor(
     private val playbackManager: PlaybackStateManager,
     private val playbackSettings: PlaybackSettings,
     private val widgetComponent: WidgetComponent,
+    private val onExitRequested: () -> Unit,
 ) : BroadcastReceiver() {
     private var initialHeadsetPlugEventHandled = false
 
@@ -50,8 +51,18 @@ private constructor(
         private val playbackManager: PlaybackStateManager,
         private val playbackSettings: PlaybackSettings,
     ) {
-        fun create(context: Context, widgetComponent: WidgetComponent) =
-            SystemPlaybackReceiver(context, playbackManager, playbackSettings, widgetComponent)
+        fun create(
+            context: Context,
+            widgetComponent: WidgetComponent,
+            onExitRequested: () -> Unit,
+        ) =
+            SystemPlaybackReceiver(
+                context,
+                playbackManager,
+                playbackSettings,
+                widgetComponent,
+                onExitRequested,
+            )
     }
 
     @Suppress("WrongConstant")
@@ -116,7 +127,7 @@ private constructor(
             }
             PlaybackActions.ACTION_EXIT -> {
                 L.d("Received exit event")
-                playbackManager.endSession()
+                onExitRequested()
             }
             WidgetProvider.ACTION_WIDGET_UPDATE -> {
                 L.d("Received widget update event")

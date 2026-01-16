@@ -152,6 +152,11 @@ class AuxioService :
                 } else {
                     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
                     isForeground = false
+
+                    if (playbackFragment.shouldStopService) {
+                        Timber.d("Exit requested, stopping service")
+                        stopSelf()
+                    }
                 }
             }
         }

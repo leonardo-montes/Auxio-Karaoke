@@ -18,6 +18,7 @@
  
 package org.oxycblt.auxio.playback.service
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.support.v4.media.session.MediaSessionCompat
@@ -27,16 +28,20 @@ import org.oxycblt.auxio.AuxioService.Companion.INTENT_KEY_START_ID
 import org.oxycblt.auxio.ForegroundListener
 import org.oxycblt.auxio.ForegroundServiceNotification
 import org.oxycblt.auxio.IntegerTable
+import org.oxycblt.auxio.playback.PlaybackSettings
 import org.oxycblt.auxio.playback.state.DeferredPlayback
 import org.oxycblt.auxio.playback.state.PlaybackStateManager
 import org.oxycblt.auxio.widgets.WidgetComponent
+import org.oxycblt.musikr.MusicParent
+import org.oxycblt.musikr.Song
 import timber.log.Timber as L
 
 class PlaybackServiceFragment
 private constructor(
-    context: Context,
+    private val context: Context,
     private val foregroundListener: ForegroundListener,
     private val playbackManager: PlaybackStateManager,
+    private val playbackSettings: PlaybackSettings,
     exoHolderFactory: ExoPlaybackStateHolder.Factory,
     sessionHolderFactory: MediaSessionHolder.Factory,
     widgetComponentFactory: WidgetComponent.Factory,
@@ -46,6 +51,7 @@ private constructor(
     @Inject
     constructor(
         private val playbackManager: PlaybackStateManager,
+        private val playbackSettings: PlaybackSettings,
         private val exoHolderFactory: ExoPlaybackStateHolder.Factory,
         private val sessionHolderFactory: MediaSessionHolder.Factory,
         private val widgetComponentFactory: WidgetComponent.Factory,
@@ -56,6 +62,7 @@ private constructor(
                 context,
                 foregroundListener,
                 playbackManager,
+                playbackSettings,
                 exoHolderFactory,
                 sessionHolderFactory,
                 widgetComponentFactory,
@@ -67,7 +74,44 @@ private constructor(
     private val exoHolder = exoHolderFactory.create()
     private val sessionHolder = sessionHolderFactory.create(context, foregroundListener)
     private val widgetComponent = widgetComponentFactory.create(context)
-    private val systemReceiver = systemReceiverFactory.create(context, widgetComponent)
+    private val activityManager =
+        context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+    private val systemReceiver =
+        systemReceiverFactory.create(
+            context,
+            widgetComponent,
+            onExitRequested = { handleExitRequest() },
+        )
+
+    // Tracks whether an intentional exit has been requested.
+    private var exitRequested = false
+
+    private fun isAppForegrounded(): Boolean {
+        val processes = activityManager.runningAppProcesses ?: return false
+        val pkg = context.packageName
+        val own = processes.find { it.processName == pkg } ?: return false
+        val imp = own.importance
+        val visible =
+            // IMPORTANCE_FOREGROUND (100): Process in foreground UI, user is interacting.
+            // IMPORTANCE_VISIBLE (200): Process visible, but not in immediate foreground.
+            imp == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                imp == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
+        L.d("Importance: $imp, visible: $visible")
+        return visible
+    }
+
+    private fun handleExitRequest() {
+        if (isAppForegrounded()) {
+            // (x) in notification will no longer exist, but it might still
+            // be triggered by other ways, e.g. Bluetooth devices.
+            L.d("Exit Requested: App visible, pausing")
+            playbackManager.playing(false)
+        } else {
+            L.d("Exit Requested: App not visible, exiting")
+            exitRequested = true
+            playbackManager.endSession()
+        }
+    }
 
     // --- MEDIASESSION CALLBACKS ---
 
@@ -81,7 +125,11 @@ private constructor(
     }
 
     fun handleTaskRemoved() {
-        if (!playbackManager.progression.isPlaying) {
+        val shouldExit =
+            !playbackManager.progression.isPlaying || playbackSettings.exitOnTaskRemoval
+
+        if (shouldExit) {
+            exitRequested = true
             playbackManager.endSession()
         }
     }
@@ -128,6 +176,9 @@ private constructor(
     val notification: ForegroundServiceNotification?
         get() = if (exoHolder.sessionOngoing) sessionHolder.notification else null
 
+    val shouldStopService: Boolean
+        get() = exitRequested && !exoHolder.sessionOngoing
+
     fun release() {
         waitJob.cancel()
         playbackManager.removeListener(this)
@@ -135,6 +186,15 @@ private constructor(
         widgetComponent.release()
         sessionHolder.release()
         exoHolder.release()
+    }
+
+    override fun onNewPlayback(
+        parent: MusicParent?,
+        queue: List<Song>,
+        index: Int,
+        isShuffled: Boolean,
+    ) {
+        exitRequested = false
     }
 
     override fun onSessionEnded() {
