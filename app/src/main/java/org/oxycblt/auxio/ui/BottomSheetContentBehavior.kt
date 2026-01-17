@@ -68,10 +68,6 @@ class BottomSheetContentBehavior<V : View>(context: Context, attributeSet: Attri
         if (consumed != lastConsumed) {
             L.d("Consumed amount changed, re-applying insets")
             lastConsumed = consumed
-            // Force insets to be recalculated. On some OEM devices (MIUI, EMUI),
-            // initial inset dispatch happens before the sheet is ready, and without
-            // this explicit request, content never receives correct bottom padding.
-            child.requestApplyInsets()
             lastInsets?.let(child::dispatchApplyWindowInsets)
             measureContent(parent, child)
             layoutContent(child)
@@ -118,19 +114,6 @@ class BottomSheetContentBehavior<V : View>(context: Context, attributeSet: Attri
             }
 
             setup = true
-        }
-
-        // Ensure consumed value is up-to-date on every layout pass. This handles cases
-        // where configuration changes (split-screen resize) trigger layout before
-        // onDependentViewChanged is called.
-        val dep = dep
-        if (dep != null) {
-            val behavior = dep.coordinatorLayoutBehavior as BackportBottomSheetBehavior
-            val consumed = behavior.calculateConsumedByBar()
-            if (consumed != Int.MIN_VALUE && consumed != lastConsumed) {
-                lastConsumed = consumed
-                child.requestApplyInsets()
-            }
         }
 
         return true
