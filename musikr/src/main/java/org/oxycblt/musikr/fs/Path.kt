@@ -80,6 +80,7 @@ sealed interface Volume {
     data class ThirdParty(val uri: Uri) : Volume {
         override val mediaStoreName: String? = null
         override val components: Components? = null
+
         override fun resolveName(context: Context) = uri.toString()
     }
 }

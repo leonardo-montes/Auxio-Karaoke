@@ -94,7 +94,9 @@ private class ExternalPlaylistManagerImpl(
     private val m3u: M3U,
 ) : ExternalPlaylistManager {
     override suspend fun import(uri: Uri): ImportedPlaylist? {
-        val filePath = documentPathFactory.unpackDocumentUri(uri) ?: Path(Volume.ThirdParty(uri), Components.root())
+        val filePath =
+            documentPathFactory.unpackDocumentUri(uri)
+                ?: Path(Volume.ThirdParty(uri), Components.root())
 
         return try {
             context.contentResolverSafe.openInputStream(uri)?.use {
@@ -119,7 +121,9 @@ private class ExternalPlaylistManagerImpl(
     }
 
     override suspend fun export(playlist: Playlist, uri: Uri, config: ExportConfig): Boolean {
-        val filePath = documentPathFactory.unpackDocumentUri(uri) ?: Path(Volume.ThirdParty(uri), Components.root())
+        val filePath =
+            documentPathFactory.unpackDocumentUri(uri)
+                ?: Path(Volume.ThirdParty(uri), Components.root())
         val workingDirectory =
             if (config.absolute) {
                 Path(filePath.volume, Components.parseUnix("/"))

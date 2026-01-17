@@ -61,7 +61,10 @@ sealed class Location(val uri: Uri, val path: Path) {
 
         companion object {
             fun from(context: Context, uri: Uri) =
-                Unopened(uri, getTreePath(context, uri) ?: Path(Volume.ThirdParty(uri), Components.root()))
+                Unopened(
+                    uri,
+                    getTreePath(context, uri) ?: Path(Volume.ThirdParty(uri), Components.root()),
+                )
 
             private fun getTreePath(context: Context, uri: Uri): Path? {
                 if (!DocumentsContract.isTreeUri(uri)) return null
