@@ -23,7 +23,11 @@ import android.content.Context
 import android.content.Intent
 import android.support.v4.media.session.MediaSessionCompat
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.oxycblt.auxio.AuxioService.Companion.INTENT_KEY_START_ID
 import org.oxycblt.auxio.ForegroundListener
 import org.oxycblt.auxio.ForegroundServiceNotification
@@ -31,6 +35,7 @@ import org.oxycblt.auxio.IntegerTable
 import org.oxycblt.auxio.playback.PlaybackSettings
 import org.oxycblt.auxio.playback.state.DeferredPlayback
 import org.oxycblt.auxio.playback.state.PlaybackStateManager
+import org.oxycblt.auxio.playback.state.Progression
 import org.oxycblt.auxio.widgets.WidgetComponent
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Song
@@ -71,6 +76,8 @@ private constructor(
     }
 
     private val waitJob = Job()
+    private val scope = CoroutineScope(Dispatchers.Main + waitJob)
+    private var autoStopJob: Job? = null
     private val exoHolder = exoHolderFactory.create()
     private val sessionHolder = sessionHolderFactory.create(context, foregroundListener)
     private val widgetComponent = widgetComponentFactory.create(context)
@@ -101,15 +108,39 @@ private constructor(
     }
 
     private fun handleExitRequest() {
-        if (isAppForegrounded()) {
-            // (x) in notification no longer exists, but it might still
-            // be triggered by other ways, e.g. Bluetooth devices.
-            L.d("Exit Requested: App visible, pausing")
-            playbackManager.playing(false)
-        } else {
-            L.d("Exit Requested: App not visible, exiting")
-            exitRequested = true
-            playbackManager.endSession()
+        val foregrounded = isAppForegrounded()
+        exitRequested = !foregrounded
+        L.d("Exit requested: foregrounded=$foregrounded, exitRequested=$exitRequested")
+        // possibly redundant?
+        // although endSession() should end up calling scheduleAutoStop() due to
+        // onProgressionChanged() override, we use it just to be safe, in case it is
+        // not called if the state was already paused.
+        scheduleAutoStop()
+        playbackManager.endSession()
+    }
+
+    private fun scheduleAutoStop() {
+        autoStopJob?.cancel()
+        autoStopJob =
+            scope.launch {
+                delay(AUTO_STOP_DELAY_MS)
+                L.d(
+                    "Auto-stop timer expired after ${AUTO_STOP_DELAY_MS / 60000} minutes of inactivity"
+                )
+                handleExitRequest()
+            }
+    }
+
+    private fun cancelAutoStop() {
+        autoStopJob?.cancel()
+        autoStopJob = null
+    }
+
+    private fun updateAutoStopTimer(isPlaying: Boolean) {
+        if (isPlaying) {
+            cancelAutoStop()
+        } else if (playbackManager.currentSong != null) {
+            scheduleAutoStop()
         }
     }
 
@@ -121,6 +152,7 @@ private constructor(
         widgetComponent.attach()
         systemReceiver.attach()
         playbackManager.addListener(this)
+        updateAutoStopTimer(playbackManager.progression.isPlaying)
         return sessionHolder.token
     }
 
@@ -180,6 +212,7 @@ private constructor(
         get() = exitRequested && !exoHolder.sessionOngoing
 
     fun release() {
+        autoStopJob?.cancel()
         waitJob.cancel()
         playbackManager.removeListener(this)
         systemReceiver.release()
@@ -195,9 +228,19 @@ private constructor(
         isShuffled: Boolean,
     ) {
         exitRequested = false
+        cancelAutoStop()
+    }
+
+    override fun onProgressionChanged(progression: Progression) {
+        // Update timer whenever play/pause state changes
+        updateAutoStopTimer(progression.isPlaying)
     }
 
     override fun onSessionEnded() {
         foregroundListener.updateForeground(ForegroundListener.Change.MEDIA_SESSION)
+    }
+
+    private companion object {
+        private const val AUTO_STOP_DELAY_MS = 30L * 60L * 1000L
     }
 }
