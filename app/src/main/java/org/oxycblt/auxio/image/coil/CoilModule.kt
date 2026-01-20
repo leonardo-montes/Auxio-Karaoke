@@ -39,6 +39,7 @@ class CoilModule {
         coverKeyer: CoverKeyer,
         coverFactory: CoverFetcher.Factory,
         coverCollectionKeyer: CoverCollectionKeyer,
+        collageCoverCollectionFactory: Collage2Fetcher.Factory,
         coverCollectionFactory: CoverCollectionFetcher.Factory,
     ) =
         ImageLoader.Builder(context)
@@ -46,6 +47,7 @@ class CoilModule {
                 add(coverKeyer)
                 add(coverFactory)
                 add(coverCollectionKeyer)
+                add(collageCoverCollectionFactory)
                 add(coverCollectionFactory)
             }
             // Use our own crossfade with error drawable support

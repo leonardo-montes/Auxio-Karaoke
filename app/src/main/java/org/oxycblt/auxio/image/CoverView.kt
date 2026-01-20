@@ -51,9 +51,13 @@ import com.google.android.material.shape.MaterialShapeDrawable
 import com.google.android.material.shape.ShapeAppearanceModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlin.math.min
+import kotlin.random.Random
 import org.oxycblt.auxio.R
+import org.oxycblt.auxio.image.coil.Collage2Config
 import org.oxycblt.auxio.image.coil.RoundedRectTransformation
 import org.oxycblt.auxio.image.coil.SquareCropTransformation
+import org.oxycblt.auxio.image.coil.enableCoverCollectionCollage
 import org.oxycblt.auxio.ui.MaterialFader
 import org.oxycblt.auxio.ui.UISettings
 import org.oxycblt.auxio.util.getAttrColorCompat
@@ -367,7 +371,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
             artist.covers,
             context.getString(R.string.desc_artist_image, artist.name),
             R.drawable.ic_artist_24,
-        )
+        ) {
+            it.enableCoverCollectionCollage(coverCollectionCollageConfig(artist.uid.hashCode()))
+        }
 
     /**
      * Bind a [Genre]'s image to this view.
@@ -379,7 +385,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
             genre.covers,
             context.getString(R.string.desc_genre_image, genre.name),
             R.drawable.ic_genre_24,
-        )
+        ) {
+            it.enableCoverCollectionCollage(coverCollectionCollageConfig(genre.uid.hashCode()))
+        }
 
     /**
      * Bind a [Playlist]'s image to this view.
@@ -403,21 +411,28 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
     fun bind(songs: List<Song>, desc: String, @DrawableRes errorRes: Int) =
         bindImpl(CoverCollection.from(songs.mapNotNull { it.cover }), desc, errorRes)
 
-    private fun bindImpl(cover: Any?, desc: String, @DrawableRes errorRes: Int) {
+    private fun bindImpl(
+        cover: Any?,
+        desc: String,
+        @DrawableRes errorRes: Int,
+        configure: (ImageRequest.Builder) -> ImageRequest.Builder = { it },
+    ) {
         val request =
-            ImageRequest.Builder(context)
-                .data(cover)
-                .error(
-                    StyledDrawable(context, context.getDrawableCompat(errorRes), iconSize).asImage()
-                )
-                .target(image)
-
-        val cornersTransformation =
-            RoundedRectTransformation(
-                shapeAppearance.topLeftCornerSize.getCornerSize(
-                    RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
-                )
+            configure(
+                ImageRequest.Builder(context)
+                    .data(cover)
+                    .error(
+                        StyledDrawable(context, context.getDrawableCompat(errorRes), iconSize)
+                            .asImage()
+                    )
+                    .target(image)
             )
+
+        val cornerBounds = resolveCornerBounds()
+        val cornerRadius =
+            cornerBounds?.let { shapeAppearance.topLeftCornerSize.getCornerSize(it) } ?: 0f
+        val cornersTransformation =
+            RoundedRectTransformation(cornerRadius)
         if (imageSettings.forceSquareCovers) {
             request.transformations(SquareCropTransformation.INSTANCE, cornersTransformation)
         } else {
@@ -428,6 +443,51 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         CoilUtils.dispose(image)
         imageLoader.enqueue(request.build())
         contentDescription = desc
+    }
+
+    private fun coverCollectionCollageConfig(uidSeed: Int): Collage2Config {
+        val zOrder = coverCollectionZOrder(uidSeed)
+        val baseConfig = Collage2Config(insetPercent = 0f, zOrder = zOrder)
+        if (!uiSettings.roundMode) {
+            return baseConfig.copy(cornerRadiusRatio = 0f)
+        }
+
+        val bounds = resolveCornerBounds() ?: return baseConfig
+        val cornerRadiusPx = shapeAppearance.topLeftCornerSize.getCornerSize(bounds)
+        if (cornerRadiusPx <= 0f) {
+            return baseConfig
+        }
+
+        val minSize = min(bounds.width(), bounds.height())
+        if (minSize <= 0f) {
+            return baseConfig
+        }
+        val cornerRatio = cornerRadiusPx / minSize
+        return baseConfig.copy(cornerRadiusRatio = cornerRatio)
+    }
+
+    private fun coverCollectionZOrder(uidSeed: Int): List<Int> {
+        val order = mutableListOf(0, 1, 2, 3)
+        order.shuffle(Random(uidSeed.toLong()))
+        return order
+    }
+
+    private fun resolveCornerBounds(): RectF? {
+        val widthPx = resolveSizePx(width, measuredWidth, layoutParams?.width)
+        val heightPx = resolveSizePx(height, measuredHeight, layoutParams?.height)
+        if (widthPx <= 0 || heightPx <= 0) {
+            return null
+        }
+        return RectF(0f, 0f, widthPx.toFloat(), heightPx.toFloat())
+    }
+
+    private fun resolveSizePx(vararg candidates: Int?): Int {
+        for (candidate in candidates) {
+            if (candidate != null && candidate > 0) {
+                return candidate
+            }
+        }
+        return 0
     }
 
     /**

@@ -18,6 +18,7 @@
  
 package org.oxycblt.auxio.image.coil
 
+import coil3.getExtra
 import coil3.key.Keyer
 import coil3.request.Options
 import javax.inject.Inject
@@ -30,5 +31,12 @@ class CoverKeyer @Inject constructor() : Keyer<Cover> {
 
 class CoverCollectionKeyer @Inject constructor() : Keyer<CoverCollection> {
     override fun key(data: CoverCollection, options: Options) =
-        "multi:${data.hashCode()}&${options.size}"
+        if (options.getExtra(CoverCollectionExtras.COLLAGE)) {
+            val config =
+                options.getExtra(CoverCollectionExtras.COLLAGE_CONFIG)
+                    ?: Collage2Config()
+            "multi:${data.hashCode()}&${options.size}&collage=${config.cacheKey()}"
+        } else {
+            "multi:${data.hashCode()}&${options.size}"
+        }
 }
