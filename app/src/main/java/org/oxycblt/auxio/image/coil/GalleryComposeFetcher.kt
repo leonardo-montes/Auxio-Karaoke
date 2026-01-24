@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2024 Auxio Project
- * CollageCoverCollectionFetcher.kt is part of Auxio.
+ * GalleryComposeFetcher.kt is part of Auxio.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,6 @@ import android.graphics.Rect
 import android.graphics.RectF
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toDrawable
-import coil3.Extras
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -40,13 +39,13 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.fetch.SourceFetchResult
-import coil3.getExtra
-import coil3.request.ImageRequest
+import coil3.key.Keyer as CoilKeyer
 import coil3.request.Options
 import coil3.size.Size
 import coil3.size.pxOrElse
 import java.io.InputStream
 import javax.inject.Inject
+import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asFlow
@@ -61,76 +60,20 @@ import org.oxycblt.auxio.R
 import org.oxycblt.auxio.util.getColorCompat
 import org.oxycblt.musikr.covers.CoverCollection
 
-private const val DEFAULT_CARD_SIZE_PERCENT = 0.60f
-private const val DEFAULT_INSET_PERCENT = 0.10f
-private const val DEFAULT_GAP_RATIO = 0.04f
-private const val DEFAULT_CORNER_RATIO = 0.08f
+data class GalleryCoverCollection(
+    val covers: CoverCollection,
+    val useRoundedCorners: Boolean,
+    val zOrder: List<Int>,
+)
 
-private fun List<Int>.normalizedZOrder(): List<Int> {
-    val expected = listOf(0, 1, 2, 3)
-    return if (size == expected.size && distinct().size == expected.size && containsAll(expected)) {
-        this
-    } else {
-        expected
-    }
-}
-
-data class Collage2Config(
-    val cardSizePercent: Float = DEFAULT_CARD_SIZE_PERCENT,
-    val insetPercent: Float = DEFAULT_INSET_PERCENT,
-    val gapWidthRatio: Float = DEFAULT_GAP_RATIO,
-    val cornerRadiusRatio: Float = DEFAULT_CORNER_RATIO,
-    val zOrder: List<Int> = listOf(0, 1, 2, 3),
-) {
-    fun normalized(): Collage2Config {
-        val normalizedZOrder = zOrder.normalizedZOrder()
-        return copy(
-            cardSizePercent = cardSizePercent.coerceIn(0.5f, 1f),
-            insetPercent = insetPercent.coerceIn(0f, 0.25f),
-            gapWidthRatio = gapWidthRatio.coerceIn(0f, 0.1f),
-            cornerRadiusRatio = cornerRadiusRatio.coerceIn(0f, 0.25f),
-            zOrder = normalizedZOrder,
-        )
-    }
-
-    fun cacheKey(): String {
-        val config = normalized()
-        return buildString {
-            append("card=")
-            append(config.cardSizePercent)
-            append("&inset=")
-            append(config.insetPercent)
-            append("&gap=")
-            append(config.gapWidthRatio)
-            append("&corner=")
-            append(config.cornerRadiusRatio)
-            append("&order=")
-            append(config.zOrder.joinToString("-"))
-        }
-    }
-}
-
-internal object CoverCollectionExtras {
-    val COLLAGE = Extras.Key(false)
-    val COLLAGE_CONFIG = Extras.Key<Collage2Config?>(null)
-}
-
-fun ImageRequest.Builder.enableCoverCollectionCollage(
-    config: Collage2Config = Collage2Config(),
-): ImageRequest.Builder = apply {
-    extras[CoverCollectionExtras.COLLAGE] = true
-    extras[CoverCollectionExtras.COLLAGE_CONFIG] = config
-}
-
-class Collage2Fetcher
+class GalleryComposeFetcher
 private constructor(
     private val context: Context,
-    private val covers: CoverCollection,
+    private val data: GalleryCoverCollection,
     private val size: Size,
-    private val config: Collage2Config,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult? {
-        val streams = covers.covers.asFlow().mapNotNull { it.open() }.take(4).toList()
+        val streams = data.covers.covers.asFlow().mapNotNull { it.open() }.take(4).toList()
         if (streams.size == 4) {
             return createCollage(streams, size).also {
                 withContext(Dispatchers.IO) { streams.forEach(InputStream::close) }
@@ -158,18 +101,17 @@ private constructor(
         if (bitmaps.size != streams.size) {
             return null
         }
-        val normalizedConfig = config.normalized()
+        val cornerRadiusPx =
+            if (data.useRoundedCorners) outputSize * ComposeCoverDefaults.CORNER_RATIO else 0f
         val collageBitmap =
             CollageGenerator.generate(
                 bitmaps,
                 CollageGenerator.Config(
                     outputSizePx = outputSize,
-                    cardSizePercent = normalizedConfig.cardSizePercent,
-                    insetPercent = normalizedConfig.insetPercent,
-                    gapWidthPx = outputSize * normalizedConfig.gapWidthRatio,
-                    cornerRadiusPx = outputSize * normalizedConfig.cornerRadiusRatio,
+                    gapWidthPx = outputSize * ComposeCoverDefaults.GAP_RATIO,
+                    cornerRadiusPx = cornerRadiusPx,
                     backgroundColor = context.getColorCompat(R.color.sel_cover_bg).defaultColor,
-                    zOrder = normalizedConfig.zOrder,
+                    zOrder = data.zOrder.validatedZOrder(),
                 ),
             )
 
@@ -189,8 +131,6 @@ private constructor(
     private object CollageGenerator {
         data class Config(
             val outputSizePx: Int,
-            val cardSizePercent: Float,
-            val insetPercent: Float,
             val gapWidthPx: Float,
             val cornerRadiusPx: Float,
             val backgroundColor: Int = Color.parseColor("#0f111a"),
@@ -215,24 +155,27 @@ private constructor(
             val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
             val totalSize = config.outputSizePx.toFloat()
-            val cardSize = totalSize * config.cardSizePercent
-            val inset = totalSize * config.insetPercent
+            val cardSize = totalSize * ComposeCoverDefaults.CARD_SIZE_PERCENT
+            val inset = 0f
+            val cornerRadiusPx =
+                if (config.cornerRadiusPx > 0f) {
+                    min(config.cornerRadiusPx, totalSize * ComposeCoverDefaults.MAX_CORNER_RATIO)
+                } else {
+                    0f
+                }
+            val gapWidthPx =
+                if (cornerRadiusPx > 0f) {
+                    max(
+                        config.gapWidthPx,
+                        cornerRadiusPx * ComposeCoverDefaults.MIN_GAP_CORNER_RATIO,
+                    )
+                } else {
+                    config.gapWidthPx
+                }
 
             val p0 = RectF(inset, inset, inset + cardSize, inset + cardSize)
-            val p1 =
-                RectF(
-                    totalSize - cardSize - inset,
-                    inset,
-                    totalSize - inset,
-                    inset + cardSize,
-                )
-            val p2 =
-                RectF(
-                    inset,
-                    totalSize - cardSize - inset,
-                    inset + cardSize,
-                    totalSize - inset,
-                )
+            val p1 = RectF(totalSize - cardSize - inset, inset, totalSize - inset, inset + cardSize)
+            val p2 = RectF(inset, totalSize - cardSize - inset, inset + cardSize, totalSize - inset)
             val p3 =
                 RectF(
                     totalSize - cardSize - inset,
@@ -242,53 +185,46 @@ private constructor(
                 )
 
             val positions = listOf(p0, p1, p2, p3)
+            val tiles =
+                positions.mapIndexed { index, baseRect ->
+                    val isTop = index < 2
+                    val isLeft = index % 2 == 0
+                    val isBottom = !isTop
+                    val isRight = !isLeft
 
-            for (imageIndex in config.zOrder) {
-                val bitmap = sourceImages[imageIndex]
-                val isTop = imageIndex < 2
-                val isLeft = imageIndex % 2 == 0
-                val isBottom = !isTop
-                val isRight = !isLeft
+                    val innerRect = RectF(baseRect)
+                    innerRect.left += if (isLeft) 0f else gapWidthPx
+                    innerRect.top += if (isTop) 0f else gapWidthPx
+                    innerRect.right -= if (isRight) 0f else gapWidthPx
+                    innerRect.bottom -= if (isBottom) 0f else gapWidthPx
 
-                val baseRect = RectF(positions[imageIndex])
+                    val gapRect = RectF(innerRect)
+                    gapRect.inset(-gapWidthPx, -gapWidthPx)
 
-                val innerRect = RectF(baseRect)
-                innerRect.left += if (isLeft) 0f else config.gapWidthPx
-                innerRect.top += if (isTop) 0f else config.gapWidthPx
-                innerRect.right -= if (isRight) 0f else config.gapWidthPx
-                innerRect.bottom -= if (isBottom) 0f else config.gapWidthPx
+                    val gapRadius = cornerRadiusPx
+                    val gapTopLeft = if (!isTop && !isLeft) gapRadius else 0f
+                    val gapTopRight = if (!isTop && !isRight) gapRadius else 0f
+                    val gapBottomRight = if (!isBottom && !isRight) gapRadius else 0f
+                    val gapBottomLeft = if (!isBottom && !isLeft) gapRadius else 0f
+                    val gapPath =
+                        Path().apply {
+                            addRoundRect(
+                                gapRect,
+                                floatArrayOf(
+                                    gapTopLeft,
+                                    gapTopLeft,
+                                    gapTopRight,
+                                    gapTopRight,
+                                    gapBottomRight,
+                                    gapBottomRight,
+                                    gapBottomLeft,
+                                    gapBottomLeft,
+                                ),
+                                Path.Direction.CW,
+                            )
+                        }
 
-                val gapRect = RectF(innerRect)
-                gapRect.inset(-config.gapWidthPx, -config.gapWidthPx)
-
-                val gapRadius = config.cornerRadiusPx
-                val gapTopLeft = if (!isTop && !isLeft) gapRadius else 0f
-                val gapTopRight = if (!isTop && !isRight) gapRadius else 0f
-                val gapBottomRight = if (!isBottom && !isRight) gapRadius else 0f
-                val gapBottomLeft = if (!isBottom && !isLeft) gapRadius else 0f
-                val gapPath =
-                    Path().apply {
-                        addRoundRect(
-                            gapRect,
-                            floatArrayOf(
-                                gapTopLeft,
-                                gapTopLeft,
-                                gapTopRight,
-                                gapTopRight,
-                                gapBottomRight,
-                                gapBottomRight,
-                                gapBottomLeft,
-                                gapBottomLeft,
-                            ),
-                            Path.Direction.CW,
-                        )
-                    }
-                canvas.drawPath(gapPath, gapPaint)
-
-                if (innerRect.width() > 0 && innerRect.height() > 0) {
-                    val savedLayer = canvas.saveLayer(innerRect, null)
-
-                    val innerRadius = (config.cornerRadiusPx - config.gapWidthPx).coerceAtLeast(0f)
+                    val innerRadius = (cornerRadiusPx - gapWidthPx).coerceAtLeast(0f)
                     val topLeftRadius = if (!isTop && !isLeft) innerRadius else 0f
                     val topRightRadius = if (!isTop && !isRight) innerRadius else 0f
                     val bottomRightRadius = if (!isBottom && !isRight) innerRadius else 0f
@@ -310,18 +246,47 @@ private constructor(
                                 Path.Direction.CW,
                             )
                         }
-                    canvas.drawPath(maskPath, imagePaint)
+
+                    TileGeometry(innerRect, gapPath, maskPath)
+                }
+
+            val zOrder = config.zOrder
+            for ((orderIndex, imageIndex) in zOrder.withIndex()) {
+                val bitmap = sourceImages[imageIndex]
+                val tile = tiles[imageIndex]
+                val visiblePath = Path(tile.gapPath)
+                for (index in orderIndex + 1 until zOrder.size) {
+                    visiblePath.op(tiles[zOrder[index]].gapPath, Path.Op.DIFFERENCE)
+                    if (visiblePath.isEmpty) {
+                        break
+                    }
+                }
+
+                if (visiblePath.isEmpty) {
+                    continue
+                }
+
+                canvas.drawPath(visiblePath, gapPaint)
+
+                if (tile.innerRect.width() > 0 && tile.innerRect.height() > 0) {
+                    val clipSave = canvas.save()
+                    canvas.clipPath(visiblePath)
+                    val savedLayer = canvas.saveLayer(tile.innerRect, null)
+                    canvas.drawPath(tile.maskPath, imagePaint)
 
                     imagePaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-                    drawBitmapCover(canvas, bitmap, innerRect, imagePaint)
+                    drawBitmapCover(canvas, bitmap, tile.innerRect, imagePaint)
                     imagePaint.xfermode = null
 
                     canvas.restoreToCount(savedLayer)
+                    canvas.restoreToCount(clipSave)
                 }
             }
 
             return result
         }
+
+        private data class TileGeometry(val innerRect: RectF, val gapPath: Path, val maskPath: Path)
 
         private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, dest: RectF, paint: Paint) {
             val bitmapRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
@@ -345,15 +310,19 @@ private constructor(
         }
     }
 
-    class Factory @Inject constructor() : Fetcher.Factory<CoverCollection> {
-        override fun create(data: CoverCollection, options: Options, imageLoader: ImageLoader) =
-            if (options.getExtra(CoverCollectionExtras.COLLAGE)) {
-                val config =
-                    options.getExtra(CoverCollectionExtras.COLLAGE_CONFIG)
-                        ?: Collage2Config()
-                Collage2Fetcher(options.context, data, options.size, config)
-            } else {
-                null
-            }
+    class Factory @Inject constructor() : Fetcher.Factory<GalleryCoverCollection> {
+        override fun create(
+            data: GalleryCoverCollection,
+            options: Options,
+            imageLoader: ImageLoader,
+        ) = GalleryComposeFetcher(options.context, data, options.size)
+    }
+
+    class Keyer @Inject constructor() : CoilKeyer<GalleryCoverCollection> {
+        override fun key(data: GalleryCoverCollection, options: Options): String {
+            val config =
+                "${if (data.useRoundedCorners) "r" else "s"}.${data.zOrder.joinToString(".")}"
+            return "g:${data.covers.hashCode()}.${options.size.width}.${options.size.height}.$config"
+        }
     }
 }

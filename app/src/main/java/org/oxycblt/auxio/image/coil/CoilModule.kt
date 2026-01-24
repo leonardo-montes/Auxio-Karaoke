@@ -36,19 +36,25 @@ class CoilModule {
     @Provides
     fun imageLoader(
         @ApplicationContext context: Context,
-        coverKeyer: CoverKeyer,
+        coverKeyer: CoverFetcher.Keyer,
         coverFactory: CoverFetcher.Factory,
-        coverCollectionKeyer: CoverCollectionKeyer,
-        collageCoverCollectionFactory: Collage2Fetcher.Factory,
-        coverCollectionFactory: CoverCollectionFetcher.Factory,
+        galleryKeyer: GalleryComposeFetcher.Keyer,
+        galleryFetcherFactory: GalleryComposeFetcher.Factory,
+        smatteringKeyer: SmatteringComposeFetcher.Keyer,
+        smatteringFetcherFactory: SmatteringComposeFetcher.Factory,
+        stackKeyer: StackComposeFetcher.Keyer,
+        stackFetcherFactory: StackComposeFetcher.Factory,
     ) =
         ImageLoader.Builder(context)
             .components {
                 add(coverKeyer)
                 add(coverFactory)
-                add(coverCollectionKeyer)
-                add(collageCoverCollectionFactory)
-                add(coverCollectionFactory)
+                add(galleryKeyer)
+                add(galleryFetcherFactory)
+                add(smatteringKeyer)
+                add(smatteringFetcherFactory)
+                add(stackKeyer)
+                add(stackFetcherFactory)
             }
             // Use our own crossfade with error drawable support
             .transitionFactory(ErrorCrossfadeTransitionFactory())

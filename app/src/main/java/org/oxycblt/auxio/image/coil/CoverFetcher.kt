@@ -24,6 +24,7 @@ import coil3.decode.ImageSource
 import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
+import coil3.key.Keyer as CoilKeyer
 import coil3.request.Options
 import javax.inject.Inject
 import okio.FileSystem
@@ -44,5 +45,9 @@ class CoverFetcher private constructor(private val cover: Cover) : Fetcher {
     class Factory @Inject constructor() : Fetcher.Factory<Cover> {
         override fun create(data: Cover, options: Options, imageLoader: ImageLoader) =
             CoverFetcher(data)
+    }
+
+    class Keyer @Inject constructor() : CoilKeyer<Cover> {
+        override fun key(data: Cover, options: Options) = "${data.id}&${options.size}"
     }
 }

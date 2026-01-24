@@ -48,16 +48,17 @@ import coil3.request.transformations
 import coil3.util.CoilUtils
 import com.google.android.material.R as MR
 import com.google.android.material.shape.MaterialShapeDrawable
+import com.google.android.material.shape.RelativeCornerSize
 import com.google.android.material.shape.ShapeAppearanceModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import kotlin.math.min
 import kotlin.random.Random
 import org.oxycblt.auxio.R
-import org.oxycblt.auxio.image.coil.Collage2Config
+import org.oxycblt.auxio.image.coil.GalleryCoverCollection
 import org.oxycblt.auxio.image.coil.RoundedRectTransformation
+import org.oxycblt.auxio.image.coil.SmatteringCoverCollection
 import org.oxycblt.auxio.image.coil.SquareCropTransformation
-import org.oxycblt.auxio.image.coil.enableCoverCollectionCollage
+import org.oxycblt.auxio.image.coil.StackCoverCollection
 import org.oxycblt.auxio.ui.MaterialFader
 import org.oxycblt.auxio.ui.UISettings
 import org.oxycblt.auxio.util.getAttrColorCompat
@@ -108,6 +109,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
     private val indicatorMatrixDst = RectF()
 
     private val shapeAppearance: ShapeAppearanceModel
+    private val circleShapeAppearance: ShapeAppearanceModel
+    private var currentShapeAppearance: ShapeAppearanceModel
+    private var circleCropEnabled = false
 
     init {
         // Obtain some StyledImageView attributes to use later when theming the custom view.
@@ -131,6 +135,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
             } else {
                 ShapeAppearanceModel.builder().build()
             }
+        circleShapeAppearance =
+            ShapeAppearanceModel.builder().setAllCornerSizes(RelativeCornerSize(0.5f)).build()
+        currentShapeAppearance = shapeAppearance
         iconSize =
             styledAttrs.getDimensionPixelSize(R.styleable.CoverView_iconSize, -1).takeIf {
                 it != -1
@@ -286,6 +293,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
 
         // Add backgrounds to each child for visual consistency
         for (child in children) {
+            if (child == selectionBadge) {
+                continue
+            }
             child.apply {
                 // If there are rounded corners, we want to make sure view content will be cropped
                 // with it.
@@ -293,10 +303,19 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
                 background =
                     MaterialShapeDrawable().apply {
                         fillColor = context.getColorCompat(R.color.sel_cover_bg)
-                        shapeAppearanceModel = shapeAppearance
+                        shapeAppearanceModel = currentShapeAppearance
                     }
             }
         }
+    }
+
+    private fun updateShapeAppearance(useCircleCrop: Boolean) {
+        if (circleCropEnabled == useCircleCrop) {
+            return
+        }
+        circleCropEnabled = useCircleCrop
+        currentShapeAppearance = if (useCircleCrop) circleShapeAppearance else shapeAppearance
+        applyBackgroundsToChildren()
     }
 
     private fun invalidateRootAlpha() {
@@ -366,14 +385,24 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      *
      * @param artist The [Artist] to bind to the view.
      */
-    fun bind(artist: Artist) =
+    fun bind(artist: Artist) {
+        // For artists we both engage in circle cropping but also arrange them
+        // in a "smattering" of random rotation/tilt to give the feeling of a messy
+        // stack of vinyl.
+        val uidSeed = artist.uid.hashCode()
         bindImpl(
-            artist.covers,
+            SmatteringCoverCollection(
+                artist.covers,
+                uiSettings.roundMode,
+                coverCollectionFanAngle(uidSeed),
+                coverCollectionTiltAngle(uidSeed),
+                coverCollectionZOrder(uidSeed),
+            ),
             context.getString(R.string.desc_artist_image, artist.name),
             R.drawable.ic_artist_24,
-        ) {
-            it.enableCoverCollectionCollage(coverCollectionCollageConfig(artist.uid.hashCode()))
-        }
+            useCircleCrop = true,
+        )
+    }
 
     /**
      * Bind a [Genre]'s image to this view.
@@ -381,13 +410,17 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      * @param genre The [Genre] to bind to the view.
      */
     fun bind(genre: Genre) =
+        // Genres are organized like a "gallery" of various covers that overlap eachother,
+        // as if they were framed on a wall.
         bindImpl(
-            genre.covers,
+            GalleryCoverCollection(
+                genre.covers,
+                uiSettings.roundMode,
+                coverCollectionZOrder(genre.uid.hashCode()),
+            ),
             context.getString(R.string.desc_genre_image, genre.name),
             R.drawable.ic_genre_24,
-        ) {
-            it.enableCoverCollectionCollage(coverCollectionCollageConfig(genre.uid.hashCode()))
-        }
+        )
 
     /**
      * Bind a [Playlist]'s image to this view.
@@ -395,8 +428,14 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      * @param playlist the [Playlist] to bind.
      */
     fun bind(playlist: Playlist) =
+        // Playlists are organized in a straight diagonal stack to give the appearance of an
+        // "orderly" pile of covers.
         bindImpl(
-            playlist.covers,
+            StackCoverCollection(
+                playlist.covers,
+                uiSettings.roundMode,
+                coverCollectionZOrder(playlist.uid.hashCode()),
+            ),
             context.getString(R.string.desc_playlist_image, playlist.name),
             R.drawable.ic_playlist_24,
         )
@@ -415,8 +454,10 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         cover: Any?,
         desc: String,
         @DrawableRes errorRes: Int,
+        useCircleCrop: Boolean = false,
         configure: (ImageRequest.Builder) -> ImageRequest.Builder = { it },
     ) {
+        updateShapeAppearance(useCircleCrop)
         val request =
             configure(
                 ImageRequest.Builder(context)
@@ -430,10 +471,9 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
 
         val cornerBounds = resolveCornerBounds()
         val cornerRadius =
-            cornerBounds?.let { shapeAppearance.topLeftCornerSize.getCornerSize(it) } ?: 0f
-        val cornersTransformation =
-            RoundedRectTransformation(cornerRadius)
-        if (imageSettings.forceSquareCovers) {
+            cornerBounds?.let { currentShapeAppearance.topLeftCornerSize.getCornerSize(it) } ?: 0f
+        val cornersTransformation = RoundedRectTransformation(cornerRadius)
+        if (useCircleCrop || imageSettings.forceSquareCovers) {
             request.transformations(SquareCropTransformation.INSTANCE, cornersTransformation)
         } else {
             request.transformations(cornersTransformation)
@@ -445,31 +485,20 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         contentDescription = desc
     }
 
-    private fun coverCollectionCollageConfig(uidSeed: Int): Collage2Config {
-        val zOrder = coverCollectionZOrder(uidSeed)
-        val baseConfig = Collage2Config(insetPercent = 0f, zOrder = zOrder)
-        if (!uiSettings.roundMode) {
-            return baseConfig.copy(cornerRadiusRatio = 0f)
-        }
-
-        val bounds = resolveCornerBounds() ?: return baseConfig
-        val cornerRadiusPx = shapeAppearance.topLeftCornerSize.getCornerSize(bounds)
-        if (cornerRadiusPx <= 0f) {
-            return baseConfig
-        }
-
-        val minSize = min(bounds.width(), bounds.height())
-        if (minSize <= 0f) {
-            return baseConfig
-        }
-        val cornerRatio = cornerRadiusPx / minSize
-        return baseConfig.copy(cornerRadiusRatio = cornerRatio)
-    }
-
     private fun coverCollectionZOrder(uidSeed: Int): List<Int> {
         val order = mutableListOf(0, 1, 2, 3)
         order.shuffle(Random(uidSeed.toLong()))
         return order
+    }
+
+    private fun coverCollectionFanAngle(uidSeed: Int): Float {
+        val random = Random(uidSeed.toLong())
+        return random.nextFloat() * 10f + 5f // 5-15 degrees
+    }
+
+    private fun coverCollectionTiltAngle(uidSeed: Int): Float {
+        val random = Random(uidSeed.toLong())
+        return random.nextFloat() * 20f - 10f // -10 to +10 degrees
     }
 
     private fun resolveCornerBounds(): RectF? {
