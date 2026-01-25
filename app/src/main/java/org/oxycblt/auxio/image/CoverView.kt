@@ -390,7 +390,7 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         // For artists we both engage in circle cropping but also arrange them
         // in a "smattering" of random rotation/tilt to give the feeling of a messy
         // stack of vinyl.
-        val uidSeed = artist.uid.hashCode()
+        val uidSeed = artist.uid.toString().hashCode()
         bindImpl(
             SmatteringCoverCollection(
                 artist.covers,
