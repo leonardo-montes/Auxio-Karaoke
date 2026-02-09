@@ -112,7 +112,10 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
             minimumWidth = context.getDimenPixels(R.dimen.size_touchable_large)
             minimumHeight = context.getDimenPixels(R.dimen.size_touchable_small)
 
-            TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Auxio_HeadlineMedium)
+            TextViewCompat.setTextAppearance(
+                this,
+                R.style.TextAppearance_Auxio_HeadlineMedium_Emphasized,
+            )
             setTextColor(
                 context.getAttrColorCompat(com.google.android.material.R.attr.colorOnSecondary)
             )

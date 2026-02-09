@@ -62,7 +62,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/spacing_medium"
                         android:text="@string/info_app_name"
-                        android:textAppearance="@style/TextAppearance.Auxio.TitleLarge"
+                        android:textAppearance="@style/TextAppearance.Auxio.TitleLarge.Emphasized"
                         app:layout_constraintBottom_toBottomOf="@+id/about_auxio_icon"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toEndOf="@+id/about_auxio_icon"
@@ -232,7 +232,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/sup_bkkellyh"
-                        android:textAppearance="@style/TextAppearance.Auxio.TitleMediumEmphasis"
+                        android:textAppearance="@style/TextAppearance.Auxio.TitleMedium.Emphasized"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@+id/about_licenses" />

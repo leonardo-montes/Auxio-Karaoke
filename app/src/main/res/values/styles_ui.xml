@@ -175,7 +175,7 @@
         <item name="android:ellipsize">marquee</item>
         <item name="android:singleLine">true</item>
         <item name="android:marqueeRepeatLimit">marquee_forever</item>
-        <item name="android:textAppearance">@style/TextAppearance.Auxio.TitleLarge</item>
+        <item name="android:textAppearance">@style/TextAppearance.Auxio.TitleLarge.Emphasized</item>
     </style>
 
     <style name="Widget.Auxio.TextView.Secondary.Base" parent="Widget.Auxio.TextView.Base">
@@ -200,7 +200,7 @@
         <item name="android:singleLine">true</item>
         <item name="android:marqueeRepeatLimit">marquee_forever</item>
         <item name="android:textColor">?android:attr/textColorPrimary</item>
-        <item name="android:textAppearance">@style/TextAppearance.Auxio.LabelLarge</item>
+        <item name="android:textAppearance">@style/TextAppearance.Auxio.LabelLarge.Emphasized</item>
     </style>
 
     <style name="Widget.Auxio.TextView.Secondary.Compact" parent="Widget.Auxio.TextView.Base">
@@ -218,11 +218,11 @@
         <item name="android:minHeight">@dimen/size_touchable_small</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:textColor">?attr/colorSecondary</item>
-        <item name="android:textAppearance">@style/TextAppearance.Auxio.LabelLarge</item>
+        <item name="android:textAppearance">@style/TextAppearance.Auxio.LabelLarge.Emphasized</item>
     </style>
 
     <style name="Widget.Auxio.TextView.Detail" parent="Widget.Auxio.TextView.Base">
-        <item name="android:textAppearance">@style/TextAppearance.Auxio.TitleLarge</item>
+        <item name="android:textAppearance">@style/TextAppearance.Auxio.TitleLarge.Emphasized</item>
         <item name="android:textAlignment">viewStart</item>
     </style>
 

@@ -198,7 +198,7 @@
             android:background="@drawable/ui_item_ripple"
             android:paddingEnd="@dimen/spacing_large"
             android:paddingVertical="@dimen/spacing_medium"
-            android:textAppearance="@style/TextAppearance.Auxio.TitleSmall"
+            android:textAppearance="@style/TextAppearance.Auxio.TitleSmall.Emphasized"
             tools:text="Extra Settings"
             app:layout_constraintTop_toBottomOf="@+id/locations_exclude_list_header_divider" />
 

@@ -17,7 +17,7 @@
         app:subtitleTextAppearance="@style/TextAppearance.Auxio.BodySmall"
         app:title="@string/lbl_playback"
         app:titleCentered="true"
-        app:titleTextAppearance="@style/TextAppearance.Auxio.LabelLarge"
+        app:titleTextAppearance="@style/TextAppearance.Auxio.LabelLarge.Emphasized"
         tools:subtitle="@string/lbl_all_songs" />
 
 

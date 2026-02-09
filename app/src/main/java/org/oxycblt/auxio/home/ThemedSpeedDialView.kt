@@ -270,7 +270,10 @@ class ThemedSpeedDialView : SpeedDialView {
                     }
                 foreground = null
                 (getChildAt(0) as TextView).apply {
-                    TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Auxio_LabelLarge)
+                    TextViewCompat.setTextAppearance(
+                        this,
+                        R.style.TextAppearance_Auxio_LabelLarge_Emphasized,
+                    )
                 }
             }
         }
