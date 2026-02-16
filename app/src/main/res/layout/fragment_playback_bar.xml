@@ -76,6 +76,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
+                app:toggleCheckedStateOnClick="false"
                 app:backgroundTint="?attr/colorSurfaceContainer"
                 app:iconTint="@color/sel_checkable_icon"
                 app:strokeColor="@color/sel_checkable_outline"
