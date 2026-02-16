@@ -37,6 +37,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.Px
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.children
+import androidx.core.view.doOnLayout
 import androidx.core.view.isEmpty
 import androidx.core.view.updateMarginsRelative
 import androidx.core.widget.ImageViewCompat
@@ -352,7 +353,7 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      */
     fun bind(song: Song) =
         bindImpl(
-            song.cover,
+            { song.cover },
             context.getString(R.string.desc_album_cover, song.album.name),
             R.drawable.ic_album_24,
         )
@@ -363,19 +364,18 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      * @param album The [Album] to bind to the view.
      */
     fun bind(album: Album) {
-        // Generally it's not desirable for many albums to show all of their covers since unlike
-        // artists/genres they don't really change.
-        // Therefore just pick the most "prominent" cover (the one with the most instances) and load
-        // that like you would a song instead.
-        val mostProminentCover =
-            album.covers.covers
-                .groupBy { it.id }
-                .maxByOrNull { it.value.size }
-                ?.value
-                ?.firstOrNull()
-
         bindImpl(
-            mostProminentCover,
+            {
+                // Generally it's not desirable for many albums to show all of their covers since
+                // unlike artists/genres they don't really change. Therefore just pick the most
+                // "prominent" cover (the one with the most instances) and load that like you
+                // would a song instead.
+                album.covers.covers
+                    .groupBy { it.id }
+                    .maxByOrNull { it.value.size }
+                    ?.value
+                    ?.firstOrNull()
+            },
             context.getString(R.string.desc_album_cover, album.name),
             R.drawable.ic_album_24,
         )
@@ -392,14 +392,16 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         // stack of vinyl.
         val uidSeed = artist.uid.toString().hashCode()
         bindImpl(
-            SmatteringCoverCollection(
-                artist.covers,
-                coverCollectionCornerRatio(),
-                coverCollectionFanAngle(uidSeed),
-                coverCollectionTiltAngle(uidSeed),
-                coverCollectionZOrder(uidSeed),
-                coverCollectionBackgroundColor(),
-            ),
+            {
+                SmatteringCoverCollection(
+                    artist.covers,
+                    coverCollectionCornerRatio(),
+                    coverCollectionFanAngle(uidSeed),
+                    coverCollectionTiltAngle(uidSeed),
+                    coverCollectionZOrder(uidSeed),
+                    coverCollectionBackgroundColor(),
+                )
+            },
             context.getString(R.string.desc_artist_image, artist.name),
             R.drawable.ic_artist_24,
             useCircleCrop = true,
@@ -415,12 +417,14 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         // Genres are organized like a "gallery" of various covers that overlap eachother,
         // as if they were framed on a wall.
         bindImpl(
-            GalleryCoverCollection(
-                genre.covers,
-                coverCollectionCornerRatio(),
-                coverCollectionZOrder(genre.uid.toString().hashCode()),
-                coverCollectionBackgroundColor(),
-            ),
+            {
+                GalleryCoverCollection(
+                    genre.covers,
+                    coverCollectionCornerRatio(),
+                    coverCollectionZOrder(genre.uid.toString().hashCode()),
+                    coverCollectionBackgroundColor(),
+                )
+            },
             context.getString(R.string.desc_genre_image, genre.name),
             R.drawable.ic_genre_24,
         )
@@ -434,12 +438,14 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
         // Playlists are organized in a straight diagonal stack to give the appearance of an
         // "orderly" pile of covers.
         bindImpl(
-            StackCoverCollection(
-                playlist.covers,
-                coverCollectionCornerRatio(),
-                coverCollectionZOrder(playlist.uid.toString().hashCode()),
-                coverCollectionBackgroundColor(),
-            ),
+            {
+                StackCoverCollection(
+                    playlist.covers,
+                    coverCollectionCornerRatio(),
+                    coverCollectionZOrder(playlist.uid.toString().hashCode()),
+                    coverCollectionBackgroundColor(),
+                )
+            },
             context.getString(R.string.desc_playlist_image, playlist.name),
             R.drawable.ic_playlist_24,
         )
@@ -452,20 +458,35 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      * @param errorRes The resource of the error drawable to use if the cover cannot be loaded.
      */
     fun bind(songs: List<Song>, desc: String, @DrawableRes errorRes: Int) =
-        bindImpl(CoverCollection.from(songs.mapNotNull { it.cover }), desc, errorRes)
+        bindImpl({ CoverCollection.from(songs.mapNotNull { it.cover }) }, desc, errorRes)
 
     private fun bindImpl(
-        cover: Any?,
+        cover: () -> Any?,
         desc: String,
         @DrawableRes errorRes: Int,
         useCircleCrop: Boolean = false,
         configure: (ImageRequest.Builder) -> ImageRequest.Builder = { it },
+        deferIfNeeded: Boolean = true,
     ) {
         updateShapeAppearance(useCircleCrop)
+        val cornerBounds = resolveCornerBounds()
+        if (deferIfNeeded && cornerBounds == null && (uiSettings.roundMode || useCircleCrop)) {
+            doOnLayout {
+                bindImpl(
+                    cover = cover,
+                    desc = desc,
+                    errorRes = errorRes,
+                    useCircleCrop = useCircleCrop,
+                    configure = configure,
+                    deferIfNeeded = false,
+                )
+            }
+            return
+        }
         val request =
             configure(
                 ImageRequest.Builder(context)
-                    .data(cover)
+                    .data(cover())
                     .error(
                         StyledDrawable(context, context.getDrawableCompat(errorRes), iconSize)
                             .asImage()
@@ -473,7 +494,6 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
                     .target(image)
             )
 
-        val cornerBounds = resolveCornerBounds()
         val cornerRadius =
             cornerBounds?.let { currentShapeAppearance.topLeftCornerSize.getCornerSize(it) } ?: 0f
         val cornersTransformation = RoundedRectTransformation(cornerRadius)
