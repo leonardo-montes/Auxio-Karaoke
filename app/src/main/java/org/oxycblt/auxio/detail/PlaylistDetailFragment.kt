@@ -208,6 +208,7 @@ class PlaylistDetailFragment :
                 editedPlaylist,
                 binding.context.getString(R.string.desc_playlist_image, playlist.name),
                 R.drawable.ic_playlist_24,
+                playlist.uid.toString().hashCode(),
             )
         } else {
             binding.detailCover.bind(playlist)

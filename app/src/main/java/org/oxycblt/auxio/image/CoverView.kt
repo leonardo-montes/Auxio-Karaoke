@@ -456,14 +456,20 @@ constructor(context: Context, attrs: AttributeSet? = null, @AttrRes defStyleAttr
      * @param songs The [Song]s to bind.
      * @param desc The content description to describe the bound data.
      * @param errorRes The resource of the error drawable to use if the cover cannot be loaded.
+     * @param uidSeed A seed for the z-order of the stack, to keep the visual consistent.
      */
-    fun bind(songs: List<Song>, desc: String, @DrawableRes errorRes: Int) =
+    fun bind(
+        songs: List<Song>,
+        desc: String,
+        @DrawableRes errorRes: Int,
+        uidSeed: Int = songs.hashCode(),
+    ) =
         bindImpl(
             {
                 StackCoverCollection(
                     CoverCollection.from(songs.mapNotNull { it.cover }),
                     coverCollectionCornerRatio(),
-                    coverCollectionZOrder(songs.hashCode()),
+                    coverCollectionZOrder(uidSeed),
                     coverCollectionBackgroundColor(),
                 )
             },
