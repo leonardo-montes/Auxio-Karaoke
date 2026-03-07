@@ -62,6 +62,8 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
 
     override fun getDetailListAdapter() = artistListAdapter
 
+    override fun getToolbarParent() = detailModel.currentArtist.value
+
     override fun onBindingCreated(binding: FragmentDetailBinding, savedInstanceState: Bundle?) {
         super.onBindingCreated(binding, savedInstanceState)
 
@@ -89,6 +91,14 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
         // Avoid possible race conditions that could cause a bad replace instruction to be consumed
         // during list initialization and crash the app. Could happen if the user is fast enough.
         detailModel.artistSongInstructions.consume()
+    }
+
+    override fun onPlayParent(parent: Artist) {
+        playbackModel.play(parent)
+    }
+
+    override fun onShuffleParent(parent: Artist) {
+        playbackModel.shuffle(parent)
     }
 
     override fun onRealClick(item: Music) {
@@ -124,7 +134,7 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
         val binding = requireBinding()
         val context = requireContext()
         val name = artist.name.resolve(context)
-        binding.detailToolbarTitle.text = name
+        binding.detailNormalToolbar.title = name
 
         binding.detailCover.bind(artist)
         binding.detailType.text = context.getString(R.string.lbl_artist)
@@ -159,8 +169,7 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
             // we want to reset the visibility of all information that was hidden.
             binding.detailPlayButton?.isEnabled = true
             binding.detailShuffleButton?.isEnabled = true
-            binding.detailToolbarPlay.isEnabled = true
-            binding.detailToolbarShuffle.isEnabled = true
+            setToolbarPlaybackButtonsEnabled(true)
         } else {
             // The artist does not have any songs, so hide functionality that makes no sense.
             // ex. Play and Shuffle, Song Counts, and Genre Information.
@@ -169,20 +178,13 @@ class ArtistDetailFragment : DetailFragment<Artist, Music>() {
             binding.detailSubhead.isVisible = false
             binding.detailPlayButton?.isEnabled = false
             binding.detailShuffleButton?.isEnabled = false
-            binding.detailToolbarPlay.isEnabled = false
-            binding.detailToolbarShuffle.isEnabled = false
+            setToolbarPlaybackButtonsEnabled(false)
         }
 
         binding.detailPlayButton?.setOnClickListener {
             playbackModel.play(unlikelyToBeNull(detailModel.currentArtist.value))
         }
-        binding.detailToolbarPlay.setOnClickListener {
-            playbackModel.play(unlikelyToBeNull(detailModel.currentArtist.value))
-        }
         binding.detailShuffleButton?.setOnClickListener {
-            playbackModel.shuffle(unlikelyToBeNull(detailModel.currentArtist.value))
-        }
-        binding.detailToolbarShuffle.setOnClickListener {
             playbackModel.shuffle(unlikelyToBeNull(detailModel.currentArtist.value))
         }
         updatePlayback(

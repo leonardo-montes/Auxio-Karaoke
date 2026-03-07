@@ -2,25 +2,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- ANDROID COMPONENT-SPECIFIC STYLES.-->
 
-    <!--
-    Hacks around the incorrectly-sized navigation icon in the Toolbar, changing it from
-    56dp to 48dp.
-    -->
-    <style name="Widget.Auxio.Toolbar.Navigation" parent="Widget.AppCompat.Toolbar.Button.Navigation">
-        <item name="android:minWidth">@dimen/size_touchable_small</item>
-    </style>
-
-    <!--
-    Hacks around the old overflow button that was deliberately downsized to 36dp
-    (presumably for compat with older devices)
-    -->
-    <style name="Widget.Auxio.Button.Overflow" parent="Widget.AppCompat.ActionButton.Overflow">
-        <item name="android:minWidth">@dimen/size_touchable_small</item>
-        <item name="android:minHeight">@dimen/size_touchable_small</item>
-        <item name="android:paddingStart">0dp</item>
-        <item name="android:paddingEnd">0dp</item>
-    </style>
-
     <style name="Theme.Auxio.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="materialAlertDialogTitleTextStyle">@style/TextStyle.Auxio.Dialog</item>
         <item name="android:checkedTextViewStyle">@style/Widget.Auxio.Dialog.CheckedTextView</item>

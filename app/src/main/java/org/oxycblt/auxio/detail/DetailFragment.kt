@@ -20,6 +20,8 @@ package org.oxycblt.auxio.detail
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MenuItem
+import android.view.View
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
@@ -38,10 +40,13 @@ import org.oxycblt.auxio.list.PlainHeader
 import org.oxycblt.auxio.music.MusicViewModel
 import org.oxycblt.auxio.playback.PlaybackViewModel
 import org.oxycblt.auxio.util.getDimenPixels
-import org.oxycblt.auxio.util.overrideOnOverflowMenuClick
 import org.oxycblt.auxio.util.setFullWidthLookup
+import org.oxycblt.musikr.Album
+import org.oxycblt.musikr.Artist
+import org.oxycblt.musikr.Genre
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.MusicParent
+import org.oxycblt.musikr.Playlist
 
 abstract class DetailFragment<P : MusicParent, C : Music> :
     ListFragment<C, FragmentDetailBinding>(),
@@ -67,6 +72,8 @@ abstract class DetailFragment<P : MusicParent, C : Music> :
     override fun onCreateBinding(inflater: LayoutInflater) = FragmentDetailBinding.inflate(inflater)
 
     abstract fun getDetailListAdapter(): DetailListAdapter
+
+    abstract fun getToolbarParent(): P?
 
     override fun getSelectionToolbar(binding: FragmentDetailBinding) =
         binding.detailSelectionToolbar
@@ -120,13 +127,73 @@ abstract class DetailFragment<P : MusicParent, C : Music> :
         detailHeader.alpha = 1 - outRatio
 
         val inRatio = max(ratio - 0.5f, 0f) * 2
-        val detailContent = binding.detailToolbarContent
-        detailContent.alpha = inRatio
-        detailContent.translationY = spacingSmall * (1 - inRatio)
+        animateToolbarView(binding.detailNormalToolbar.getTitleContainer(), inRatio)
+        animateToolbarActionButton(binding.detailNormalToolbar.getMenuButton(R.id.action_play), inRatio)
+        animateToolbarActionButton(
+            binding.detailNormalToolbar.getMenuButton(R.id.action_shuffle),
+            inRatio,
+        )
 
         // Enable fast scrolling once fully collapsed
         binding.detailRecycler.fastScrollingEnabled = ratio == 1f
     }
+
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        if (super.onMenuItemClick(item)) {
+            return true
+        }
+
+        val parent = getToolbarParent() ?: return false
+        return when (item.itemId) {
+            R.id.action_play -> {
+                onPlayParent(parent)
+                true
+            }
+            R.id.action_shuffle -> {
+                onShuffleParent(parent)
+                true
+            }
+            else -> false
+        }
+    }
+
+    protected fun setToolbarPlaybackButtonsEnabled(
+        playEnabled: Boolean,
+        shuffleEnabled: Boolean = playEnabled,
+    ) {
+        binding?.detailNormalToolbar?.apply {
+            setMenuItemEnabled(R.id.action_play, playEnabled)
+            setMenuItemEnabled(R.id.action_shuffle, shuffleEnabled)
+        }
+    }
+
+    private fun animateToolbarView(view: View?, ratio: Float) {
+        view?.alpha = ratio
+        view?.translationY = spacingSmall * (1 - ratio)
+    }
+
+    private fun animateToolbarActionButton(view: View?, ratio: Float) {
+        if (view == null) {
+            return
+        }
+
+        if (ratio <= 0f) {
+            view.alpha = 0f
+            view.translationY = spacingSmall.toFloat()
+            view.visibility = View.GONE
+            return
+        }
+
+        if (view.visibility != View.VISIBLE) {
+            view.visibility = View.VISIBLE
+        }
+        view.alpha = ratio
+        view.translationY = spacingSmall * (1 - ratio)
+    }
+
+    protected abstract fun onPlayParent(parent: P)
+
+    protected abstract fun onShuffleParent(parent: P)
 
     abstract fun onOpenParentMenu()
 }

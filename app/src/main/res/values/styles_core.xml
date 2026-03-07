@@ -115,8 +115,6 @@
         <item name="dialogPreferenceStyle">@style/Preference.Auxio.DialogPreference</item>
         <item name="switchPreferenceCompatStyle">@style/Preference.Auxio.SwitchPreferenceCompat
         </item>
-        <item name="toolbarNavigationButtonStyle">@style/Widget.Auxio.Toolbar.Navigation</item>
-        <item name="actionOverflowButtonStyle">@style/Widget.Auxio.Button.Overflow</item>
         <item name="materialButtonGroupStyle">@style/Widget.Auxio.MaterialButtonGroup</item>
     </style>
 

@@ -17,7 +17,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <com.google.android.material.appbar.MaterialToolbar
+            <org.oxycblt.auxio.ui.AuxioToolbar
                 android:id="@+id/search_normal_toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -47,9 +47,9 @@
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-            </com.google.android.material.appbar.MaterialToolbar>
+            </org.oxycblt.auxio.ui.AuxioToolbar>
 
-            <org.oxycblt.auxio.ui.ButtonGroupToolbar
+            <org.oxycblt.auxio.ui.AuxioToolbar
                 android:id="@+id/search_selection_toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

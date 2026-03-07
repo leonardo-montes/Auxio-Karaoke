@@ -41,10 +41,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDirections
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.viewbinding.ViewBinding
-import com.google.android.material.appbar.MaterialToolbar
 import java.lang.IllegalArgumentException
 import org.oxycblt.auxio.R
-import org.oxycblt.auxio.ui.ButtonGroupToolbar
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Song
 import timber.log.Timber as L
@@ -108,33 +106,6 @@ val View.isRtl: Boolean
 /** Get a [Context] from a [ViewBinding]'s root [View]. */
 val ViewBinding.context: Context
     get() = root.context
-
-/**
- * Override the behavior of a [MaterialToolbar]'s overflow menu to do something else. This is
- * extremely dumb, but required to hook overflow menus to bottom sheet menus.
- */
-@SuppressLint("RestrictedApi")
-fun Toolbar.overrideOnOverflowMenuClick(block: (View) -> Unit) {
-    if (this is ButtonGroupToolbar) {
-        // ButtonGroupToolbar manages its own overflow button, delegate directly.
-        overrideOnOverflowMenuClick(block)
-        return
-    }
-    for (toolbarChild in children) {
-        if (toolbarChild is ActionMenuView) {
-            for (menuChild in toolbarChild.children) {
-                // The overflow menu's view implementation is package-private, so test for the
-                // first child that isn't a plain action button.
-                if (menuChild !is ActionMenuItemView) {
-                    // Override all listeners related to opening the overflow menu.
-                    menuChild.setOnTouchListener(null)
-                    menuChild.setOnClickListener(block)
-                    return
-                }
-            }
-        }
-    }
-}
 
 /**
  * Shortcut to easily set up a [GridLayoutManager.SpanSizeLookup].

@@ -14,7 +14,7 @@
         style="@style/Widget.Auxio.AppBarLayout"
         app:liftOnScroll="true">
 
-        <com.google.android.material.appbar.MaterialToolbar
+        <org.oxycblt.auxio.ui.AuxioToolbar
             android:id="@+id/about_toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

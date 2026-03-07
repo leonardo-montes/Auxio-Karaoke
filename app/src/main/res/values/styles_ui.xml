@@ -428,6 +428,14 @@
         <item name="colorOnContainer">?attr/colorOnSecondaryContainer</item>
     </style>
 
+    <style name="ThemeOverlay.Auxio.IconButton.Style.Small.Primary" parent="">
+        <item name="materialIconButtonStyle">@style/Widget.Auxio.Button.Icon.Small.Primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Auxio.IconButton.Style.Small.Secondary" parent="">
+        <item name="materialIconButtonStyle">@style/Widget.Auxio.Button.Icon.Small.Secondary</item>
+    </style>
+
     <style name="Widget.Auxio.Button.PlayPause" parent="Widget.Material3Expressive.Button.IconButton">
         <item name="android:checkable">true</item>
     </style>

@@ -39,6 +39,7 @@ import org.oxycblt.auxio.util.getPlural
 import org.oxycblt.auxio.util.navigateSafe
 import org.oxycblt.auxio.util.showToast
 import org.oxycblt.auxio.util.unlikelyToBeNull
+import org.oxycblt.musikr.Album
 import org.oxycblt.musikr.Artist
 import org.oxycblt.musikr.Genre
 import org.oxycblt.musikr.Music
@@ -59,6 +60,8 @@ class GenreDetailFragment : DetailFragment<Genre, Music>() {
     private val genreListAdapter = GenreDetailListAdapter(this)
 
     override fun getDetailListAdapter() = genreListAdapter
+
+    override fun getToolbarParent() = detailModel.currentGenre.value
 
     override fun onBindingCreated(binding: FragmentDetailBinding, savedInstanceState: Bundle?) {
         super.onBindingCreated(binding, savedInstanceState)
@@ -87,6 +90,14 @@ class GenreDetailFragment : DetailFragment<Genre, Music>() {
         // Avoid possible race conditions that could cause a bad replace instruction to be consumed
         // during list initialization and crash the app. Could happen if the user is fast enough.
         detailModel.genreSongInstructions.consume()
+    }
+
+    override fun onPlayParent(parent: Genre) {
+        playbackModel.play(parent)
+    }
+
+    override fun onShuffleParent(parent: Genre) {
+        playbackModel.shuffle(parent)
     }
 
     override fun onRealClick(item: Music) {
@@ -122,7 +133,7 @@ class GenreDetailFragment : DetailFragment<Genre, Music>() {
         val binding = requireBinding()
         val context = requireContext()
         val name = genre.name.resolve(context)
-        binding.detailToolbarTitle.text = name
+        binding.detailNormalToolbar.title = name
         binding.detailCover.bind(genre)
         binding.detailType.text = context.getString(R.string.lbl_genre)
         binding.detailName.text = genre.name.resolve(context)
@@ -138,15 +149,10 @@ class GenreDetailFragment : DetailFragment<Genre, Music>() {
         binding.detailPlayButton?.setOnClickListener {
             playbackModel.play(unlikelyToBeNull(detailModel.currentGenre.value))
         }
-        binding.detailToolbarPlay.setOnClickListener {
-            playbackModel.play(unlikelyToBeNull(detailModel.currentGenre.value))
-        }
         binding.detailShuffleButton?.setOnClickListener {
             playbackModel.shuffle(unlikelyToBeNull(detailModel.currentGenre.value))
         }
-        binding.detailToolbarShuffle.setOnClickListener {
-            playbackModel.shuffle(unlikelyToBeNull(detailModel.currentGenre.value))
-        }
+        setToolbarPlaybackButtonsEnabled(true)
         updatePlayback(
             playbackModel.song.value,
             playbackModel.parent.value,

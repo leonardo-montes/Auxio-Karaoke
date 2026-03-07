@@ -43,6 +43,7 @@ import org.oxycblt.auxio.util.navigateSafe
 import org.oxycblt.auxio.util.showToast
 import org.oxycblt.auxio.util.unlikelyToBeNull
 import org.oxycblt.musikr.Album
+import org.oxycblt.musikr.Artist
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Song
@@ -61,6 +62,8 @@ class AlbumDetailFragment : DetailFragment<Album, Song>() {
     private val albumListAdapter = AlbumDetailListAdapter(this)
 
     override fun getDetailListAdapter() = albumListAdapter
+
+    override fun getToolbarParent() = detailModel.currentAlbum.value
 
     override fun onBindingCreated(binding: FragmentDetailBinding, savedInstanceState: Bundle?) {
         super.onBindingCreated(binding, savedInstanceState)
@@ -91,6 +94,14 @@ class AlbumDetailFragment : DetailFragment<Album, Song>() {
         detailModel.albumSongInstructions.consume()
     }
 
+    override fun onPlayParent(parent: Album) {
+        playbackModel.play(parent)
+    }
+
+    override fun onShuffleParent(parent: Album) {
+        playbackModel.shuffle(parent)
+    }
+
     override fun onRealClick(item: Song) {
         playbackModel.play(item, detailModel.playInAlbumWith)
     }
@@ -118,7 +129,7 @@ class AlbumDetailFragment : DetailFragment<Album, Song>() {
         val context = requireContext()
         val name = album.name.resolve(context)
 
-        binding.detailToolbarTitle.text = name
+        binding.detailNormalToolbar.title = name
         binding.detailCover.bind(album)
         // The type text depends on the release type (Album, EP, Single, etc.)
         binding.detailType.text = album.releaseType.resolve(context)
@@ -146,15 +157,10 @@ class AlbumDetailFragment : DetailFragment<Album, Song>() {
         binding.detailPlayButton?.setOnClickListener {
             playbackModel.play(unlikelyToBeNull(detailModel.currentAlbum.value))
         }
-        binding.detailToolbarPlay.setOnClickListener {
-            playbackModel.play(unlikelyToBeNull(detailModel.currentAlbum.value))
-        }
         binding.detailShuffleButton?.setOnClickListener {
             playbackModel.shuffle(unlikelyToBeNull(detailModel.currentAlbum.value))
         }
-        binding.detailToolbarShuffle.setOnClickListener {
-            playbackModel.shuffle(unlikelyToBeNull(detailModel.currentAlbum.value))
-        }
+        setToolbarPlaybackButtonsEnabled(true)
         updatePlayback(
             playbackModel.song.value,
             playbackModel.parent.value,

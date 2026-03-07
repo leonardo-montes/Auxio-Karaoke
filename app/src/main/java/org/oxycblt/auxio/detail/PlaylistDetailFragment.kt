@@ -48,6 +48,7 @@ import org.oxycblt.auxio.util.getPlural
 import org.oxycblt.auxio.util.navigateSafe
 import org.oxycblt.auxio.util.showToast
 import org.oxycblt.auxio.util.unlikelyToBeNull
+import org.oxycblt.musikr.Genre
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Playlist
@@ -73,6 +74,8 @@ class PlaylistDetailFragment :
     private var pendingImportTarget: Playlist? = null
 
     override fun getDetailListAdapter() = playlistListAdapter
+
+    override fun getToolbarParent() = detailModel.currentPlaylist.value
 
     override fun onBindingCreated(binding: FragmentDetailBinding, savedInstanceState: Bundle?) {
         super.onBindingCreated(binding, savedInstanceState)
@@ -164,6 +167,14 @@ class PlaylistDetailFragment :
         editNavigationListener = null
     }
 
+    override fun onPlayParent(parent: Playlist) {
+        playbackModel.play(parent)
+    }
+
+    override fun onShuffleParent(parent: Playlist) {
+        playbackModel.shuffle(parent)
+    }
+
     override fun onRealClick(item: Song) {
         playbackModel.play(item, detailModel.playInPlaylistWith)
     }
@@ -198,7 +209,7 @@ class PlaylistDetailFragment :
             return
         }
         val binding = requireBinding()
-        binding.detailToolbarTitle.text = playlist.name.resolve(requireContext())
+        binding.detailNormalToolbar.title = playlist.name.resolve(requireContext())
         binding.detailEditToolbar.title =
             getString(R.string.fmt_editing, playlist.name.resolve(requireContext()))
 
@@ -244,24 +255,13 @@ class PlaylistDetailFragment :
                 playbackModel.play(unlikelyToBeNull(detailModel.currentPlaylist.value))
             }
         }
-        binding.detailToolbarPlay.apply {
-            isEnabled = playable
-            setOnClickListener {
-                playbackModel.play(unlikelyToBeNull(detailModel.currentPlaylist.value))
-            }
-        }
         binding.detailShuffleButton?.apply {
             isEnabled = playable
             setOnClickListener {
                 playbackModel.shuffle(unlikelyToBeNull(detailModel.currentPlaylist.value))
             }
         }
-        binding.detailToolbarShuffle.apply {
-            isEnabled = playable
-            setOnClickListener {
-                playbackModel.shuffle(unlikelyToBeNull(detailModel.currentPlaylist.value))
-            }
-        }
+        setToolbarPlaybackButtonsEnabled(playable)
         updatePlayback(
             playbackModel.song.value,
             playbackModel.parent.value,
@@ -279,9 +279,10 @@ class PlaylistDetailFragment :
 
         if (editedPlaylist != null) {
             L.d("Updating save button state")
-            requireBinding().detailEditToolbar.menu.findItem(R.id.action_save).apply {
-                isEnabled = editedPlaylist != detailModel.currentPlaylist.value?.songs
-            }
+            requireBinding().detailEditToolbar.setMenuItemEnabled(
+                R.id.action_save,
+                editedPlaylist != detailModel.currentPlaylist.value?.songs,
+            )
         }
 
         updateMultiToolbar()
