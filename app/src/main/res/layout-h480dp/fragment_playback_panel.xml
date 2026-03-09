@@ -32,6 +32,35 @@
         app:layout_constraintTop_toBottomOf="@+id/playback_toolbar"
         app:layout_constraintVertical_chainStyle="packed" />
 
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/playback_lyrics_background"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@android:color/black"
+        app:cardElevation="0dp"
+        app:strokeWidth="0dp"
+        app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Large"
+        app:layout_constraintBottom_toBottomOf="@+id/playback_cover"
+        app:layout_constraintEnd_toEndOf="@+id/playback_cover"
+        app:layout_constraintStart_toStartOf="@+id/playback_cover"
+        app:layout_constraintTop_toTopOf="@+id/playback_cover" />
+
+    <org.oxycblt.auxio.playback.ui.KaraokeTextView
+        android:id="@+id/playback_lyrics"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:gravity="center"
+        android:padding="@dimen/spacing_medium"
+        android:visibility="gone"
+        android:textColor="@android:color/white"
+        android:textAppearance="@style/TextAppearance.Auxio.TitleLarge"
+        app:layout_constraintBottom_toBottomOf="@+id/playback_cover"
+        app:layout_constraintEnd_toEndOf="@+id/playback_cover"
+        app:layout_constraintStart_toStartOf="@+id/playback_cover"
+        app:layout_constraintTop_toTopOf="@+id/playback_cover"
+        tools:text="Song Lyrics Go Here..." />
+
     <LinearLayout
         android:id="@+id/playback_info_container"
         android:layout_width="0dp"

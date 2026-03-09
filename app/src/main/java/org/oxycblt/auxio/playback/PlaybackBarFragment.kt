@@ -20,6 +20,8 @@ package org.oxycblt.auxio.playback
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
+import android.widget.LinearLayout
 import androidx.fragment.app.activityViewModels
 import com.google.android.material.R as MR
 import dagger.hilt.android.AndroidEntryPoint
@@ -71,6 +73,10 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
 
         // Set up actions
         binding.playbackPlayPause.setOnClickListener { playbackModel.togglePlaying() }
+        binding.actionShowLyrics.setOnClickListener { playbackModel.toggleLyrics() }
+
+        //binding.actionShowLyrics.setOnClickListener { updateLyricsVisibility(playbackModel.showLyrics) }
+        collectImmediately(playbackModel.showLyrics, ::updateLyricsVisibility)
 
         //        binding.playbackProgressBar.wavelength = 48
         //        binding.playbackProgressBar.speed = 20
@@ -85,6 +91,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
             playbackModel.repeatMode,
             playbackModel.isShuffled,
             ::updateBarAction)
+        collectImmediately(playbackModel.lyrics, ::updateLyrics)
     }
 
     override fun onDestroyBinding(binding: FragmentPlaybackBarBinding) {
@@ -92,6 +99,22 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         // Marquee elements leak if they are not disabled when the views are destroyed.
         binding.playbackSong.isSelected = false
         binding.playbackInfo.isSelected = false
+    }
+
+    private fun updateLyricsVisibility(showLyrics: Boolean) {
+        L.e("lyrics is $showLyrics")
+        val binding = requireBinding()
+        binding.playbackLyrics.visibility = if (showLyrics) View.VISIBLE else View.GONE
+        binding.playbackLyricsBackground.visibility = if (showLyrics) View.VISIBLE else View.GONE
+
+        //val params = binding.playbackCover.layoutParams as LinearLayout.LayoutParams
+        //params.weight = if (showLyrics) 2f else 1f
+
+        // Update menu item state if it exists
+        binding.actionShowLyrics.apply {
+            // We use icon alpha to show "on/off" state for menu items usually
+            icon?.alpha = if (showLyrics) 255 else 128
+        }
     }
 
     private fun updateSong(song: Song?) {
@@ -110,10 +133,40 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
 
     private fun updatePlaying(isPlaying: Boolean) {
         requireBinding().playbackPlayPause.isActivated = isPlaying
+
+        // START or STOP the high-frequency fluid timer
+        val binding = requireBinding()
+        if (isPlaying) {
+            binding.playbackLyrics.startAnimation(true)
+        } else {
+            binding.playbackLyrics.stopAnimation()
+        }
     }
 
     private fun updatePosition(positionDs: Long) {
-        requireBinding().playbackProgressBar.progress = positionDs.toInt()
+        val binding = requireBinding()
+        binding.playbackProgressBar.progress = positionDs.toInt()
+
+        val positionMs = positionDs.dsToMs() + 200 // 200ms offset
+        if (playbackModel.lyrics.value != null) {
+            binding.playbackLyrics.setPosition(positionMs)
+            if (!binding.playbackPlayPause.isActivated) {
+                binding.playbackLyrics.startAnimation(false)
+            }
+        }
+    }
+
+    private fun updateLyrics(lyrics: TimedLyrics?) {
+        val binding = requireBinding()
+        if (lyrics != null) {
+            binding.playbackLyrics.setTimedLyrics(lyrics)
+            updatePosition(playbackModel.positionDs.value)
+        } else {
+            binding.playbackLyrics.setTimedLyrics(null)
+            if (playbackModel.showLyrics.value) {
+                binding.playbackLyrics.text = "No lyrics found."
+            }
+        }
     }
 
     private fun updateBarAction(

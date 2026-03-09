@@ -15,26 +15,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 package org.oxycblt.auxio.playback
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.media.audiofx.AudioEffect
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.MenuItem
+import android.view.View
 import android.view.ViewTreeObserver
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import org.oxycblt.auxio.R
 import org.oxycblt.auxio.databinding.FragmentPlaybackPanelBinding
 import org.oxycblt.auxio.detail.DetailViewModel
 import org.oxycblt.auxio.list.ListViewModel
+import org.oxycblt.auxio.music.MusicSettings
 import org.oxycblt.auxio.music.resolve
 import org.oxycblt.auxio.music.resolveNames
 import org.oxycblt.auxio.playback.state.RepeatMode
@@ -42,7 +40,6 @@ import org.oxycblt.auxio.playback.ui.ControlledCoverView
 import org.oxycblt.auxio.playback.ui.StyledSeekBar
 import org.oxycblt.auxio.ui.ViewBindingFragment
 import org.oxycblt.auxio.util.collectImmediately
-import org.oxycblt.auxio.util.showToast
 import org.oxycblt.auxio.util.systemBarInsetsCompat
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Song
@@ -63,10 +60,11 @@ class PlaybackPanelFragment :
     StyledSeekBar.Listener,
     ControlledCoverView.OnSwipeListener,
     ViewTreeObserver.OnGlobalLayoutListener {
+    @Inject lateinit var musicSettings: MusicSettings
+
     private val playbackModel: PlaybackViewModel by activityViewModels()
     private val detailModel: DetailViewModel by activityViewModels()
     private val listModel: ListViewModel by activityViewModels()
-    private var equalizerLauncher: ActivityResultLauncher<Intent>? = null
     private var lastCoverWidth = 0
 
     override fun onCreateBinding(inflater: LayoutInflater) =
@@ -77,13 +75,6 @@ class PlaybackPanelFragment :
         savedInstanceState: Bundle?
     ) {
         super.onBindingCreated(binding, savedInstanceState)
-
-        // AudioEffect expects you to use startActivityForResult with the panel intent. There is no
-        // contract analogue for this intent, so the generic contract is used instead.
-        equalizerLauncher =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                // Nothing to do
-            }
 
         // --- UI SETUP ---
         binding.root.setOnApplyWindowInsetsListener { view, insets ->
@@ -133,6 +124,8 @@ class PlaybackPanelFragment :
         collectImmediately(playbackModel.repeatMode, ::updateRepeat)
         collectImmediately(playbackModel.isPlaying, ::updatePlaying)
         collectImmediately(playbackModel.isShuffled, ::updateShuffled)
+        collectImmediately(playbackModel.showLyrics, ::updateLyricsVisibility)
+        collectImmediately(playbackModel.lyrics, ::updateLyrics)
     }
 
     override fun onStart() {
@@ -170,7 +163,6 @@ class PlaybackPanelFragment :
     }
 
     override fun onDestroyBinding(binding: FragmentPlaybackPanelBinding) {
-        equalizerLauncher = null
         binding.playbackSong.isSelected = false
         binding.playbackArtist.isSelected = false
         binding.playbackAlbum?.isSelected = false
@@ -178,23 +170,8 @@ class PlaybackPanelFragment :
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_open_equalizer) {
-            // Launch the system equalizer app, if possible.
-            L.d("Launching equalizer")
-            val equalizerIntent =
-                Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
-                    // Provide audio session ID so the equalizer can show options for this app
-                    // in particular.
-                    .putExtra(AudioEffect.EXTRA_AUDIO_SESSION, playbackModel.currentAudioSessionId)
-                    // Signal music type so that the equalizer settings are appropriate for
-                    // music playback.
-                    .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-            try {
-                requireNotNull(equalizerLauncher) { "Equalizer panel launcher was not available" }
-                    .launch(equalizerIntent)
-            } catch (e: ActivityNotFoundException) {
-                requireContext().showToast(R.string.err_no_app)
-            }
+        if (item.itemId == R.id.action_show_lyrics) {
+            playbackModel.toggleLyrics()
             return true
         }
 
@@ -245,7 +222,16 @@ class PlaybackPanelFragment :
     }
 
     private fun updatePosition(positionDs: Long) {
-        requireBinding().playbackSeekBar?.positionDs = positionDs
+        val binding = requireBinding()
+        binding.playbackSeekBar?.positionDs = positionDs
+        
+        val positionMs = positionDs.dsToMs() + 200 // 200ms offset
+        if (playbackModel.lyrics.value != null) {
+            binding.playbackLyrics.setPosition(positionMs)
+            if (!binding.playbackPlayPause.isActivated) {
+                binding.playbackLyrics.startAnimation(false)
+            }
+        }
     }
 
     private fun updateRepeat(repeatMode: RepeatMode) {
@@ -257,10 +243,44 @@ class PlaybackPanelFragment :
 
     private fun updatePlaying(isPlaying: Boolean) {
         requireBinding().playbackPlayPause.isActivated = isPlaying
+
+        // START or STOP the high-frequency fluid timer
+        val binding = requireBinding()
+        if (isPlaying) {
+            binding.playbackLyrics.startAnimation(true)
+        } else {
+            binding.playbackLyrics.stopAnimation()
+        }
     }
 
     private fun updateShuffled(isShuffled: Boolean) {
         requireBinding().playbackShuffle.isActivated = isShuffled
+    }
+
+    private fun updateLyricsVisibility(showLyrics: Boolean) {
+        val binding = requireBinding()
+        binding.playbackCover.visibility = if (showLyrics) View.INVISIBLE else View.VISIBLE
+        binding.playbackLyrics.visibility = if (showLyrics) View.VISIBLE else View.GONE
+        binding.playbackLyricsBackground.visibility = if (showLyrics) View.VISIBLE else View.GONE
+
+        // Update menu item state if it exists
+        binding.playbackToolbar.menu.findItem(R.id.action_show_lyrics)?.apply {
+            // We use icon alpha to show "on/off" state for menu items usually
+            icon?.alpha = if (showLyrics) 255 else 128
+        }
+    }
+
+    private fun updateLyrics(lyrics: TimedLyrics?) {
+        val binding = requireBinding()
+        if (lyrics != null) {
+            binding.playbackLyrics.setTimedLyrics(lyrics)
+            updatePosition(playbackModel.positionDs.value)
+        } else {
+            binding.playbackLyrics.setTimedLyrics(null)
+            if (playbackModel.showLyrics.value) {
+                binding.playbackLyrics.text = "No lyrics found."
+            }
+        }
     }
 
     private fun navigateToCurrentSong() {

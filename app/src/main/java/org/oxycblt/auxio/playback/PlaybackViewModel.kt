@@ -26,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.oxycblt.auxio.list.ListSettings
 import org.oxycblt.auxio.playback.state.DeferredPlayback
@@ -60,6 +61,7 @@ constructor(
     private val playbackSettings: PlaybackSettings,
     private val commandFactory: PlaybackCommand.Factory,
     private val listSettings: ListSettings,
+    private val lyricsRepository: LyricsRepository
 ) : ViewModel(), PlaybackStateManager.Listener, PlaybackSettings.Listener {
     private var lastPositionJob: Job? = null
 
@@ -91,6 +93,16 @@ constructor(
     val isShuffled: StateFlow<Boolean>
         get() = _isShuffled
 
+    private val _showLyrics = MutableStateFlow(false)
+    /** Whether to show lyrics instead of the cover. */
+    val showLyrics: StateFlow<Boolean>
+        get() = _showLyrics
+
+    private val _lyrics = MutableStateFlow<TimedLyrics?>(null)
+    /** The currently loaded lyrics. */
+    val lyrics: StateFlow<TimedLyrics?>
+        get() = _lyrics
+
     private val _currentBarAction = MutableStateFlow(playbackSettings.barAction)
     /** The current secondary action to show alongside the play button in the playback bar. */
     val currentBarAction: StateFlow<ActionMode>
@@ -121,6 +133,17 @@ constructor(
     init {
         playbackManager.addListener(this)
         playbackSettings.registerListener(this)
+
+        // React to song changes by loading lyrics
+        viewModelScope.launch {
+            song.collectLatest { song ->
+                if (song != null) {
+                    _lyrics.value = lyricsRepository.loadLyrics(song)
+                } else {
+                    _lyrics.value = null
+                }
+            }
+        }
     }
 
     override fun onCleared() {
@@ -589,6 +612,12 @@ constructor(
     fun toggleShuffled() {
         L.d("Toggling shuffled state")
         playbackManager.shuffled(!playbackManager.isShuffled)
+    }
+
+    /** Toggle [showLyrics] (ex. from on to off) */
+    fun toggleLyrics() {
+        L.d("Toggling lyrics state")
+        _showLyrics.value = !_showLyrics.value
     }
 
     /**
