@@ -24,6 +24,7 @@ import android.view.View
 import android.widget.LinearLayout
 import androidx.fragment.app.activityViewModels
 import com.google.android.material.R as MR
+import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import org.oxycblt.auxio.R
 import org.oxycblt.auxio.databinding.FragmentPlaybackBarBinding
@@ -74,6 +75,25 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         // Set up actions
         binding.playbackPlayPause.setOnClickListener { playbackModel.togglePlaying() }
         binding.actionShowLyrics.setOnClickListener { playbackModel.toggleLyrics() }
+        binding.actionShowKaraoke.setOnClickListener { playbackModel.toggleKaraoke() }
+
+        // Karaoke controls
+        binding.karaokeVocalsToggle.setOnClickListener { playbackModel.toggleVocals() }
+        binding.karaokeAccompanimentToggle.setOnClickListener { playbackModel.toggleAccompaniment() }
+
+        binding.karaokeVocalsVolume.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                playbackModel.setVocalsVolume(slider.value.toInt())
+            }
+        })
+
+        binding.karaokeAccompanimentVolume.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                playbackModel.setAccompanimentVolume(slider.value.toInt())
+            }
+        })
 
         //binding.actionShowLyrics.setOnClickListener { updateLyricsVisibility(playbackModel.showLyrics) }
         collectImmediately(playbackModel.showLyrics, ::updateLyricsVisibility)
@@ -92,6 +112,26 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
             playbackModel.isShuffled,
             ::updateBarAction)
         collectImmediately(playbackModel.lyrics, ::updateLyrics)
+
+        // Karaoke state observers
+        collectImmediately(playbackModel.showKaraoke, ::updateKaraokeVisibility)
+        collectImmediately(playbackModel.vocalsEnabled, ::updateVocalsState)
+        collectImmediately(playbackModel.accompanimentEnabled, ::updateAccompanimentState)
+        collectImmediately(playbackModel.vocalsVolume) { volume ->
+            binding.karaokeVocalsVolume.value = volume.toFloat()
+        }
+        collectImmediately(playbackModel.accompanimentVolume) { volume ->
+            binding.karaokeAccompanimentVolume.value = volume.toFloat()
+        }
+    }
+
+    private fun updateKaraokeVisibility(showKaraoke: Boolean) {
+        L.e("karaoke is $showKaraoke")
+        val binding = requireBinding()
+        binding.playbackKaraokeContainer.visibility = if (showKaraoke) View.VISIBLE else View.GONE
+        binding.actionShowKaraoke.apply {
+            icon?.alpha = if (showKaraoke) 255 else 128
+        }
     }
 
     override fun onDestroyBinding(binding: FragmentPlaybackBarBinding) {
@@ -115,6 +155,20 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
             // We use icon alpha to show "on/off" state for menu items usually
             icon?.alpha = if (showLyrics) 255 else 128
         }
+    }
+
+    private fun updateVocalsState(enabled: Boolean) {
+        val binding = requireBinding()
+        binding.karaokeVocalsToggle.icon?.alpha = if (enabled) 255 else 128
+        binding.karaokeVocalsVolume.alpha = if (enabled) 1.0f else 0.5f
+        binding.karaokeVocalsVolume.isEnabled = enabled
+    }
+
+    private fun updateAccompanimentState(enabled: Boolean) {
+        val binding = requireBinding()
+        binding.karaokeAccompanimentToggle.icon?.alpha = if (enabled) 255 else 128
+        binding.karaokeAccompanimentVolume.alpha = if (enabled) 1.0f else 0.5f
+        binding.karaokeAccompanimentVolume.isEnabled = enabled
     }
 
     private fun updateSong(song: Song?) {

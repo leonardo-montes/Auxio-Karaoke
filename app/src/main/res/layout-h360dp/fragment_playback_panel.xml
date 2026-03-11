@@ -127,7 +127,7 @@
         android:layout_marginStart="@dimen/spacing_mid_medium"
         android:layout_marginEnd="@dimen/spacing_mid_medium"
         android:layout_marginBottom="@dimen/spacing_medium"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/playback_karaoke_container"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -201,5 +201,64 @@
 
     </org.oxycblt.auxio.playback.ui.ForcedLTRFrameLayout>
 
+    <LinearLayout
+        android:id="@+id/playback_karaoke_container"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_marginStart="@dimen/spacing_medium"
+        android:layout_marginEnd="@dimen/spacing_medium"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <org.oxycblt.auxio.ui.RippleFixMaterialButton
+                android:id="@+id/karaoke_vocals_toggle"
+                style="@style/Widget.Auxio.Button.Icon.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:icon="@drawable/ic_karaoke_vocals_24" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/karaoke_vocals_volume"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0.0"
+                android:valueTo="100.0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <org.oxycblt.auxio.ui.RippleFixMaterialButton
+                android:id="@+id/karaoke_accompaniment_toggle"
+                style="@style/Widget.Auxio.Button.Icon.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:icon="@drawable/ic_karaoke_accompaniment_24" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/karaoke_accompaniment_volume"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0.0"
+                android:valueTo="100.0" />
+        </LinearLayout>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

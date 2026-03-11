@@ -59,6 +59,16 @@ private class ExploreStepImpl(private val fs: FS, private val storage: Storage) 
                 if (!file.mimeType.startsWith("audio/") && file.mimeType != M3U.MIME_TYPE) {
                     return@mapParallel null
                 }
+                
+                val name = file.path.name
+                if (name != null) {
+                    val dotIndex = name.lastIndexOf('.')
+                    val baseName = if (dotIndex != -1) name.substring(0, dotIndex) else name
+                    if (baseName.endsWith("_vocals") || baseName.endsWith("_accompaniment")) {
+                        return@mapParallel null
+                    }
+                }
+
                 val cacheResult = storage.cache.read(file)
                 when (cacheResult) {
                     is CacheResult.Hit -> NeedsCover(cacheResult.song)

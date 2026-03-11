@@ -26,6 +26,7 @@ import android.view.ViewTreeObserver
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
+import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import org.oxycblt.auxio.R
@@ -117,6 +118,24 @@ class PlaybackPanelFragment :
             }
         }
 
+        // Karaoke controls
+        binding.karaokeVocalsToggle?.setOnClickListener { playbackModel.toggleVocals() }
+        binding.karaokeAccompanimentToggle?.setOnClickListener { playbackModel.toggleAccompaniment() }
+        
+        binding.karaokeVocalsVolume?.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                playbackModel.setVocalsVolume(slider.value.toInt())
+            }
+        })
+        
+        binding.karaokeAccompanimentVolume?.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                playbackModel.setAccompanimentVolume(slider.value.toInt())
+            }
+        })
+
         // --- VIEWMODEL SETUP --
         collectImmediately(playbackModel.song, ::updateSong)
         collectImmediately(playbackModel.parent, ::updateParent)
@@ -125,6 +144,19 @@ class PlaybackPanelFragment :
         collectImmediately(playbackModel.isPlaying, ::updatePlaying)
         collectImmediately(playbackModel.isShuffled, ::updateShuffled)
         collectImmediately(playbackModel.showLyrics, ::updateLyricsVisibility)
+        collectImmediately(playbackModel.showKaraoke, ::updateKaraokeVisibility)
+        
+        // Karaoke state observers
+        collectImmediately(playbackModel.vocalsEnabled, ::updateVocalsState)
+        collectImmediately(playbackModel.accompanimentEnabled, ::updateAccompanimentState)
+        collectImmediately(playbackModel.vocalsVolume) { volume ->
+            binding.karaokeVocalsVolume?.value = volume.toFloat()
+        }
+        collectImmediately(playbackModel.accompanimentVolume) { volume ->
+            binding.karaokeAccompanimentVolume?.value = volume.toFloat()
+        }
+        collectImmediately(playbackModel.hasKaraokeFiles, ::updateKaraokeFilesState)
+
         collectImmediately(playbackModel.lyrics, ::updateLyrics)
     }
 
@@ -172,6 +204,9 @@ class PlaybackPanelFragment :
     override fun onMenuItemClick(item: MenuItem): Boolean {
         if (item.itemId == R.id.action_show_lyrics) {
             playbackModel.toggleLyrics()
+            return true
+        } else if (item.itemId == R.id.action_show_karaoke) {
+            playbackModel.toggleKaraoke()
             return true
         }
 
@@ -268,6 +303,36 @@ class PlaybackPanelFragment :
             // We use icon alpha to show "on/off" state for menu items usually
             icon?.alpha = if (showLyrics) 255 else 128
         }
+    }
+
+    private fun updateKaraokeVisibility(showKaraoke: Boolean) {
+        val binding = requireBinding()
+        binding.playbackKaraokeContainer?.visibility = if (showKaraoke) View.VISIBLE else View.GONE
+
+        // Update menu item state if it exists
+        binding.playbackToolbar.menu.findItem(R.id.action_show_karaoke)?.apply {
+            icon?.alpha = if (showKaraoke) 255 else 128
+        }
+    }
+
+    private fun updateVocalsState(enabled: Boolean) {
+        val binding = requireBinding()
+        binding.karaokeVocalsToggle?.icon?.alpha = if (enabled) 255 else 128
+        binding.karaokeVocalsVolume?.alpha = if (enabled) 1.0f else 0.5f
+        binding.karaokeVocalsVolume?.isEnabled = enabled
+    }
+
+    private fun updateAccompanimentState(enabled: Boolean) {
+        val binding = requireBinding()
+        binding.karaokeAccompanimentToggle?.icon?.alpha = if (enabled) 255 else 128
+        binding.karaokeAccompanimentVolume?.alpha = if (enabled) 1.0f else 0.5f
+        binding.karaokeAccompanimentVolume?.isEnabled = enabled
+    }
+
+    private fun updateKaraokeFilesState(hasFiles: Boolean) {
+        val binding = requireBinding()
+        //binding.karaokeControlsContainer?.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        //binding.karaokeEmptyText?.visibility = if (hasFiles) View.GONE else View.VISIBLE
     }
 
     private fun updateLyrics(lyrics: TimedLyrics?) {

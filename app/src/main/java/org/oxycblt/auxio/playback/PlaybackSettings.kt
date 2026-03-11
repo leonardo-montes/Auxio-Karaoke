@@ -61,6 +61,17 @@ interface PlaybackSettings : Settings<PlaybackSettings.Listener> {
     /** Whether to maintain the play/pause state when skipping or editing the queue */
     val rememberPause: Boolean
 
+    /** Whether karaoke mode is enabled. */
+    var karaokeEnabled: Boolean
+    /** Whether vocals are enabled in karaoke mode. */
+    var karaokeVocalsEnabled: Boolean
+    /** Whether accompaniment is enabled in karaoke mode. */
+    var karaokeAccompanimentEnabled: Boolean
+    /** The volume of the vocals in karaoke mode (0-100). */
+    var karaokeVocalsVolume: Int
+    /** The volume of the accompaniment in karaoke mode (0-100). */
+    var karaokeAccompanimentVolume: Int
+
     interface Listener {
         /** Called when one of the ReplayGain configurations have changed. */
         fun onReplayGainSettingsChanged() {}
@@ -70,6 +81,10 @@ interface PlaybackSettings : Settings<PlaybackSettings.Listener> {
         fun onBarActionChanged() {}
         /** Called when [pauseOnRepeat] has changed. */
         fun onPauseOnRepeatChanged() {}
+        /** Called when [karaokeEnabled] has changed. */
+        fun onKaraokeModeChanged() {}
+        /** Called when any karaoke volume or toggle state has changed. */
+        fun onKaraokeSettingsChanged() {}
     }
 }
 
@@ -134,6 +149,26 @@ class PlaybackSettingsImpl @Inject constructor(@ApplicationContext context: Cont
     override val rememberPause: Boolean
         get() = sharedPreferences.getBoolean(getString(R.string.set_key_remember_pause), false)
 
+    override var karaokeEnabled: Boolean
+        get() = sharedPreferences.getBoolean(getString(R.string.set_key_karaoke_enabled), false)
+        set(value) = sharedPreferences.edit { putBoolean(getString(R.string.set_key_karaoke_enabled), value) }
+
+    override var karaokeVocalsEnabled: Boolean
+        get() = sharedPreferences.getBoolean(getString(R.string.set_key_karaoke_vocals_enabled), true)
+        set(value) = sharedPreferences.edit { putBoolean(getString(R.string.set_key_karaoke_vocals_enabled), value) }
+
+    override var karaokeAccompanimentEnabled: Boolean
+        get() = sharedPreferences.getBoolean(getString(R.string.set_key_karaoke_accompaniment_enabled), true)
+        set(value) = sharedPreferences.edit { putBoolean(getString(R.string.set_key_karaoke_accompaniment_enabled), value) }
+
+    override var karaokeVocalsVolume: Int
+        get() = sharedPreferences.getInt(getString(R.string.set_key_karaoke_vocals_volume), 100)
+        set(value) = sharedPreferences.edit { putInt(getString(R.string.set_key_karaoke_vocals_volume), value) }
+
+    override var karaokeAccompanimentVolume: Int
+        get() = sharedPreferences.getInt(getString(R.string.set_key_karaoke_accompaniment_volume), 100)
+        set(value) = sharedPreferences.edit { putInt(getString(R.string.set_key_karaoke_accompaniment_volume), value) }
+
     override fun migrate() {
         // MusicMode was converted to PlaySong in 3.2.0
         fun Int.migrateMusicMode() =
@@ -197,6 +232,17 @@ class PlaybackSettingsImpl @Inject constructor(@ApplicationContext context: Cont
             getString(R.string.set_key_repeat_pause) -> {
                 L.d("Dispatching pause on repeat change")
                 listener.onPauseOnRepeatChanged()
+            }
+            getString(R.string.set_key_karaoke_enabled) -> {
+                L.d("Dispatching karaoke mode change")
+                listener.onKaraokeModeChanged()
+            }
+            getString(R.string.set_key_karaoke_vocals_enabled),
+            getString(R.string.set_key_karaoke_accompaniment_enabled),
+            getString(R.string.set_key_karaoke_vocals_volume),
+            getString(R.string.set_key_karaoke_accompaniment_volume) -> {
+                L.d("Dispatching karaoke settings change")
+                listener.onKaraokeSettingsChanged()
             }
         }
     }

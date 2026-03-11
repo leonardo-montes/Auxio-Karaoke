@@ -98,6 +98,36 @@ constructor(
     val showLyrics: StateFlow<Boolean>
         get() = _showLyrics
 
+    private val _showKaraoke = MutableStateFlow(false)
+    /** Whether to show the karaoke panel. */
+    val showKaraoke: StateFlow<Boolean>
+        get() = _showKaraoke
+
+    private val _vocalsEnabled = MutableStateFlow(true)
+    /** Whether vocals are enabled in karaoke mode. */
+    val vocalsEnabled: StateFlow<Boolean>
+        get() = _vocalsEnabled
+
+    private val _accompanimentEnabled = MutableStateFlow(true)
+    /** Whether accompaniment is enabled in karaoke mode. */
+    val accompanimentEnabled: StateFlow<Boolean>
+        get() = _accompanimentEnabled
+
+    private val _vocalsVolume = MutableStateFlow(100)
+    /** The volume level of the vocals (0-100). */
+    val vocalsVolume: StateFlow<Int>
+        get() = _vocalsVolume
+
+    private val _accompanimentVolume = MutableStateFlow(100)
+    /** The volume level of the accompaniment (0-100). */
+    val accompanimentVolume: StateFlow<Int>
+        get() = _accompanimentVolume
+
+    private val _hasKaraokeFiles = MutableStateFlow(false)
+    /** Whether the current song has karaoke audio files. */
+    val hasKaraokeFiles: StateFlow<Boolean>
+        get() = _hasKaraokeFiles
+
     private val _lyrics = MutableStateFlow<TimedLyrics?>(null)
     /** The currently loaded lyrics. */
     val lyrics: StateFlow<TimedLyrics?>
@@ -134,13 +164,15 @@ constructor(
         playbackManager.addListener(this)
         playbackSettings.registerListener(this)
 
-        // React to song changes by loading lyrics
+        // React to song changes by loading lyrics and checking for karaoke files
         viewModelScope.launch {
             song.collectLatest { song ->
                 if (song != null) {
                     _lyrics.value = lyricsRepository.loadLyrics(song)
+                    _hasKaraokeFiles.value = false
                 } else {
                     _lyrics.value = null
+                    _hasKaraokeFiles.value = false
                 }
             }
         }
@@ -618,6 +650,36 @@ constructor(
     fun toggleLyrics() {
         L.d("Toggling lyrics state")
         _showLyrics.value = !_showLyrics.value
+    }
+
+    /** Toggle [showKaraoke] (ex. from on to off) */
+    fun toggleKaraoke() {
+        L.d("Toggling karaoke state")
+        _showKaraoke.value = !_showKaraoke.value
+    }
+
+    /** Toggle [vocalsEnabled] (ex. from on to off) */
+    fun toggleVocals() {
+        L.d("Toggling vocals enabled state")
+        _vocalsEnabled.value = !_vocalsEnabled.value
+    }
+
+    /** Toggle [accompanimentEnabled] (ex. from on to off) */
+    fun toggleAccompaniment() {
+        L.d("Toggling accompaniment enabled state")
+        _accompanimentEnabled.value = !_accompanimentEnabled.value
+    }
+
+    /** Set [vocalsVolume] (0-100) */
+    fun setVocalsVolume(volume: Int) {
+        L.d("Setting vocals volume to $volume")
+        _vocalsVolume.value = volume.coerceIn(0, 100)
+    }
+
+    /** Set [accompanimentVolume] (0-100) */
+    fun setAccompanimentVolume(volume: Int) {
+        L.d("Setting accompaniment volume to $volume")
+        _accompanimentVolume.value = volume.coerceIn(0, 100)
     }
 
     /**

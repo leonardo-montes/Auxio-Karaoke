@@ -340,6 +340,12 @@
     <string name="set_rescan">Rescan music</string>
     <string name="set_rescan_desc">Clear the tag cache and fully reload the music library (slower, but more complete)</string>
 
+    <string name="set_key_karaoke_enabled" translatable="false">auxio_karaoke_enabled</string>
+    <string name="set_key_karaoke_vocals_enabled" translatable="false">auxio_karaoke_vocals_enabled</string>
+    <string name="set_key_karaoke_accompaniment_enabled" translatable="false">auxio_karaoke_accompaniment_enabled</string>
+    <string name="set_key_karaoke_vocals_volume" translatable="false">auxio_karaoke_vocals_volume</string>
+    <string name="set_key_karaoke_accompaniment_volume" translatable="false">auxio_karaoke_accompaniment_volume</string>
+
     <!-- Error Namespace | Error Labels -->
     <string name="err_index_failed">Music loading failed</string>
     <string name="err_import_failed">Unable to import a playlist from this file</string>
@@ -471,6 +477,8 @@
     <!-- As in the total duration of all songs in the music library -->
     <string name="fmt_lib_total_duration">Total duration: %s</string>
     <string name="lbl_lyrics">Lyrics</string>
+    <string name="lbl_karaoke">Karaoke</string>
+    <string name="lbl_no_audio_file_found">No audio file found.</string>
 
     <plurals name="fmt_song_count">
         <item quantity="one">%d song</item>
