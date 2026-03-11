@@ -18,15 +18,22 @@
  
 package org.oxycblt.auxio.playback
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.application
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.oxycblt.auxio.list.ListSettings
 import org.oxycblt.auxio.playback.state.DeferredPlayback
@@ -44,6 +51,7 @@ import org.oxycblt.musikr.Genre
 import org.oxycblt.musikr.MusicParent
 import org.oxycblt.musikr.Playlist
 import org.oxycblt.musikr.Song
+import kotlin.math.abs
 import timber.log.Timber as L
 
 /**
@@ -57,6 +65,7 @@ import timber.log.Timber as L
 class PlaybackViewModel
 @Inject
 constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val playbackManager: PlaybackStateManager,
     private val playbackSettings: PlaybackSettings,
     private val commandFactory: PlaybackCommand.Factory,
@@ -155,6 +164,11 @@ constructor(
     val playbackDecision: Event<PlaybackDecision>
         get() = _playbackDecision
 
+    /** Whether the karaoke engine should actually be running audio right now. */
+    val isKaraokeActive: StateFlow<Boolean> = combine(showKaraoke, hasKaraokeFiles) { show, has ->
+        show && has
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     /**
      * The current audio session ID of the internal player. Null if no audio player is available.
      */
@@ -168,6 +182,7 @@ constructor(
         // React to song changes by loading lyrics and checking for karaoke files
         viewModelScope.launch {
             song.collectLatest { song ->
+                releaseKaraokePlayers()
                 if (song != null) {
                     _lyrics.value = lyricsRepository.loadLyrics(song)
                     _hasKaraokeFiles.value = karaokeRepository.hasKaraokeFiles(song)
@@ -177,9 +192,106 @@ constructor(
                 }
             }
         }
+
+        // NEW: Add this reactive bridge to handle muting the main track
+        viewModelScope.launch {
+            isKaraokeActive.collectLatest { active ->
+                if (active) {
+                    playbackManager.setVolume(0f)
+                    setupKaraokeTracks()
+                } else {
+                    playbackManager.setVolume(1f)
+                    releaseKaraokePlayers()
+                }
+            }
+        }
+
+        //1. Sync Play/Pause state
+        viewModelScope.launch {
+            combine(isPlaying, isKaraokeActive) { playing, active ->
+                playing to active
+            }.collectLatest { (playing, active) ->
+                if (active) {
+                    if (playing) {
+                        vocalsPlayer?.play()
+                        accompanimentPlayer?.play()
+                    } else {
+                        vocalsPlayer?.pause()
+                        accompanimentPlayer?.pause()
+                    }
+                }
+            }
+        }
+
+        // 2. Sync Vocals Volume & Mute Button
+        viewModelScope.launch {
+            combine(vocalsVolume, vocalsEnabled, isKaraokeActive) { vol, enabled, active ->
+                if (active && enabled) vol / 100f else 0f
+            }.collectLatest { targetVol ->
+                vocalsPlayer?.volume = targetVol
+            }
+        }
+
+        // 3. Sync Accompaniment Volume & Mute Button
+        viewModelScope.launch {
+            combine(accompanimentVolume, accompanimentEnabled, isKaraokeActive) { vol, enabled, active ->
+                if (active && enabled) vol / 100f else 0f
+            }.collectLatest { targetVol ->
+                accompanimentPlayer?.volume = targetVol
+            }
+        }
+    }
+
+    private var vocalsPlayer: ExoPlayer? = null
+    private var accompanimentPlayer: ExoPlayer? = null
+
+    fun setupKaraokeTracks() {
+        val currentSong = _song.value ?: return
+
+        viewModelScope.launch {
+            // 1. Get the file paths from your repository
+            val files = karaokeRepository.getKaraokeFiles(currentSong) ?: return@launch
+
+            // 2. Clean up existing players if they exist
+            releaseKaraokePlayers()
+
+            // 3. Initialize Vocals Player
+            vocalsPlayer = ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(files.vocals))
+                volume = if (_vocalsEnabled.value) _vocalsVolume.value / 100f else 0f
+                prepare()
+            }
+
+            // 4. Initialize Accompaniment Player
+            accompanimentPlayer = ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(files.accompaniment))
+                volume = if (_accompanimentEnabled.value) _accompanimentVolume.value / 100f else 0f
+                prepare()
+            }
+
+            // 5. Synchronize and Start
+            // Get the current position of the main (muted) track
+            val currentPos = playbackManager.progression.calculateElapsedPositionMs() // Convert ds to ms
+
+            vocalsPlayer?.seekTo(currentPos)
+            accompanimentPlayer?.seekTo(currentPos)
+
+            if (_isPlaying.value) {
+                vocalsPlayer?.play()
+                accompanimentPlayer?.play()
+            }
+        }
+    }
+
+    private fun releaseKaraokePlayers() {
+        vocalsPlayer?.release()
+        vocalsPlayer = null
+        accompanimentPlayer?.release()
+        accompanimentPlayer = null
     }
 
     override fun onCleared() {
+        releaseKaraokePlayers()
         playbackManager.removeListener(this)
         playbackSettings.unregisterListener(this)
     }
@@ -217,15 +329,44 @@ constructor(
     override fun onProgressionChanged(progression: Progression) {
         L.d("Player state changed, starting new position polling")
         _isPlaying.value = progression.isPlaying
+
         // Still need to update the position now due to co-routine launch delays
-        _positionDs.value = progression.calculateElapsedPositionMs().msToDs()
+        val mainPosMs = progression.calculateElapsedPositionMs()
+        _positionDs.value = mainPosMs.msToDs()
+
+        // Sync stem positions if they are active
+        if (isKaraokeActive.value) {
+            vocalsPlayer?.let { vPlayer ->
+                // If drift > 100ms, force re-sync
+                if (abs(vPlayer.currentPosition - mainPosMs) > 100) {
+                    vPlayer.seekTo(mainPosMs)
+                }
+            }
+            accompanimentPlayer?.let { aPlayer ->
+                if (abs(aPlayer.currentPosition - mainPosMs) > 100) {
+                    aPlayer.seekTo(mainPosMs)
+                }
+            }
+        }
+
         // Replace the previous position co-routine with a new one that uses the new
         // state information.
         lastPositionJob?.cancel()
         lastPositionJob =
             viewModelScope.launch {
                 while (true) {
-                    _positionDs.value = progression.calculateElapsedPositionMs().msToDs()
+                    val currentMs = progression.calculateElapsedPositionMs()
+                    _positionDs.value = currentMs.msToDs()
+
+                    if (isKaraokeActive.value) {
+                        vocalsPlayer?.let { v ->
+                            if (abs(v.currentPosition - currentMs) > 150) v.seekTo(currentMs)
+                        }
+                        accompanimentPlayer?.let { a ->
+                            if (abs(a.currentPosition - currentMs) > 150) a.seekTo(currentMs)
+                        }
+                    }
+
                     // Wait a deci-second for the next position tick.
                     delay(100)
                 }

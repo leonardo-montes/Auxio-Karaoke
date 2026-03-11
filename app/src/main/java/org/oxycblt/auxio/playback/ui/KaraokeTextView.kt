@@ -23,6 +23,7 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
+import android.view.animation.AnimationUtils
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.graphics.withClip
 import androidx.core.graphics.withSave
@@ -52,10 +53,12 @@ class KaraokeTextView @JvmOverloads constructor(
     private var isPlaying = false
 
     fun startAnimation(isPlaying: Boolean) {
-        if (isAnimating) return
-        isAnimating = true
         this.isPlaying = isPlaying
-        lastFrameTime = System.currentTimeMillis()
+        if (isAnimating) {
+            return
+        }
+        isAnimating = true
+        lastFrameTime = AnimationUtils.currentAnimationTimeMillis()
         postOnAnimation(animationRunnable)
     }
 
@@ -70,14 +73,14 @@ class KaraokeTextView @JvmOverloads constructor(
             if (!isAnimating) return
 
             // 1. Calculate how much time has passed since the last frame
-            val now = System.currentTimeMillis()
+            val now = AnimationUtils.currentAnimationTimeMillis()
             val elapsed = now - lastFrameTime
             lastFrameTime = now
 
             // 2. Manually advance the internal positionMs
             // (Assuming the music is playing)
             positionMs += elapsed
-            //L.e("delta time: $elapsed")
+            L.e("delta time: $elapsed")
 
             // 3. Redraw immediately
             invalidate()
@@ -129,6 +132,8 @@ class KaraokeTextView @JvmOverloads constructor(
 
         val lineOffset = lineHeight / 2.0f
 
+        val now = AnimationUtils.currentAnimationTimeMillis()
+
         // Get current line id
         var newLyricLineId = 0
         for (i in 1 until timedLyrics!!.lines.count()) {
@@ -141,7 +146,7 @@ class KaraokeTextView @JvmOverloads constructor(
         if (newLyricLineId != lyricLineId) {
             prevLyricLineId = lyricLineId
             lyricLineId = newLyricLineId
-            lastLyricLineIdChangeTime = System.currentTimeMillis()
+            lastLyricLineIdChangeTime = now
             lastVerticalOffset = verticalOffset
             verticalOffset = -getLineHeight(canvas, timedLyrics!!.lines, lineOffset, lyricLineId)
             lastLyricLineIdTime = 0.0f;
@@ -154,7 +159,7 @@ class KaraokeTextView @JvmOverloads constructor(
         }
 
         // Get time (t) from last time we changed stuff (500ms)
-        lastLyricLineIdTime = ((System.currentTimeMillis() - lastLyricLineIdChangeTime).toDouble() / 300.0).toFloat()
+        lastLyricLineIdTime = ((now - lastLyricLineIdChangeTime).toDouble() / 300.0).toFloat()
         if (lastLyricLineIdTime > 1.0f)
             lastLyricLineIdTime = 1.0f
         else if (lastLyricLineIdTime < 0.0f)

@@ -69,6 +69,8 @@ interface PlaybackStateManager {
     /** The audio session ID of the internal player. Null if no internal player exists. */
     val currentAudioSessionId: Int?
 
+    fun setVolume(volume: Float)
+
     /**
      * Add a [Listener] to this instance. This can be used to receive changes in the playback state.
      * Will immediately invoke [Listener] methods to initialize the instance with the current state.
@@ -447,6 +449,13 @@ class PlaybackStateManagerImpl @Inject constructor() : PlaybackStateManager {
         // Played something, so we are initialized now
         isInitialized = true
         stateHolder.newPlayback(command)
+    }
+
+    @Synchronized
+    override fun setVolume(volume: Float) {
+        val stateHolder = stateHolder ?: return
+        L.d("Setting volume to $volume")
+        stateHolder.setVolume(volume)
     }
 
     // --- QUEUE FUNCTIONS ---

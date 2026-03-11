@@ -126,7 +126,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateKaraokeVisibility(showKaraoke: Boolean) {
-        L.e("karaoke is $showKaraoke")
+        //L.e("karaoke is $showKaraoke")
         val binding = requireBinding()
         binding.playbackKaraokeContainer.visibility = if (showKaraoke) View.VISIBLE else View.GONE
         binding.actionShowKaraoke.apply {

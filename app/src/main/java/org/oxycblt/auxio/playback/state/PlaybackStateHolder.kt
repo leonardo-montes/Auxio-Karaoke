@@ -41,6 +41,8 @@ interface PlaybackStateHolder {
     /** The current [MusicParent] being played from. Null if playing from all songs. */
     val parent: MusicParent?
 
+    fun setVolume(volume: Float)
+
     /**
      * Resolve the current queue state as a [RawQueue].
      *

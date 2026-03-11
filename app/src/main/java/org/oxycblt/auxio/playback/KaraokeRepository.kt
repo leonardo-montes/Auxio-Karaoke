@@ -47,9 +47,19 @@ class KaraokeRepository @Inject constructor(
      * @return True if both vocals and accompaniment files are found.
      */
     suspend fun hasKaraokeFiles(song: Song): Boolean = withContext(Dispatchers.IO) {
+        getKaraokeFiles(song) != null
+    }
+
+    /**
+     * Get the URIs for the karaoke files of the given [Song].
+     *
+     * @param song The [Song] to get files for.
+     * @return A [KaraokeFiles] object containing the URIs, or null if not found.
+     */
+    suspend fun getKaraokeFiles(song: Song): KaraokeFiles? = withContext(Dispatchers.IO) {
         val path = song.path
-        val fileName = path.name ?: return@withContext false
-        if (!fileName.contains(".")) return@withContext false
+        val fileName = path.name ?: return@withContext null
+        if (!fileName.contains(".")) return@withContext null
         
         val baseName = fileName.substringBeforeLast(".")
         val extension = fileName.substringAfterLast(".")
@@ -57,22 +67,23 @@ class KaraokeRepository @Inject constructor(
         val vocalsName = "${baseName}_vocals.$extension"
         val accompanimentName = "${baseName}_accompaniment.$extension"
         
-        val vocalsFound = exists(song, vocalsName)
-        val accompanimentFound = exists(song, accompanimentName)
+        val vocalsUri = findUri(song, vocalsName)
+        val accompanimentUri = findUri(song, accompanimentName)
 
-        //if (vocalsFound) L.e("Found vocals file: $vocalsName")
-        //if (accompanimentFound) L.e("Found accompaniment file: $accompanimentName")
-        
-        vocalsFound && accompanimentFound
+        if (vocalsUri != null && accompanimentUri != null) {
+            KaraokeFiles(vocalsUri, accompanimentUri)
+        } else {
+            null
+        }
     }
 
-    private fun exists(song: Song, targetFileName: String): Boolean {
+    private fun findUri(song: Song, targetFileName: String): Uri? {
         // 1. Try SAF URI
-        val uri = findSafUri(song, targetFileName)
-        if (uri != null) {
+        val safUri = findSafUri(song, targetFileName)
+        if (safUri != null) {
             try {
-                context.contentResolver.openInputStream(uri)?.use {
-                    return true
+                context.contentResolver.openInputStream(safUri)?.use {
+                    return safUri
                 }
             } catch (e: Exception) {
                 // Ignore and try fallback
@@ -86,10 +97,12 @@ class KaraokeRepository @Inject constructor(
         if (volumePath != null) {
             val absolutePath = "/" + volumePath.child(path.components.parent().child(targetFileName)).unixString
             val file = File(absolutePath)
-            return file.exists() && file.canRead()
+            if (file.exists() && file.canRead()) {
+                return Uri.fromFile(file)
+            }
         }
 
-        return false
+        return null
     }
 
     private fun findSafUri(song: Song, targetFileName: String): Uri? {
@@ -143,4 +156,9 @@ class KaraokeRepository @Inject constructor(
 
         return null
     }
+
+    /**
+     * Data class for holding karaoke file URIs.
+     */
+    data class KaraokeFiles(val vocals: Uri, val accompaniment: Uri)
 }

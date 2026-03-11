@@ -260,6 +260,10 @@ class ExoPlaybackStateHolder(
         deferSave()
     }
 
+    override fun setVolume(volume: Float) {
+        player.volume = volume
+    }
+
     override fun shuffled(shuffled: Boolean) {
         player.setShuffleModeEnabled(shuffled)
         if (player.shuffleModeEnabled) {
