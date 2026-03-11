@@ -331,8 +331,8 @@ class PlaybackPanelFragment :
 
     private fun updateKaraokeFilesState(hasFiles: Boolean) {
         val binding = requireBinding()
-        //binding.karaokeControlsContainer?.visibility = if (hasFiles) View.VISIBLE else View.GONE
-        //binding.karaokeEmptyText?.visibility = if (hasFiles) View.GONE else View.VISIBLE
+        binding.karaokeControls?.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        binding.karaokeEmptyText?.visibility = if (hasFiles) View.GONE else View.VISIBLE
     }
 
     private fun updateLyrics(lyrics: TimedLyrics?) {

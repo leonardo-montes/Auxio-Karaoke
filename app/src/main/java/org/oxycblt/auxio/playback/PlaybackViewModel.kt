@@ -61,7 +61,8 @@ constructor(
     private val playbackSettings: PlaybackSettings,
     private val commandFactory: PlaybackCommand.Factory,
     private val listSettings: ListSettings,
-    private val lyricsRepository: LyricsRepository
+    private val lyricsRepository: LyricsRepository,
+    private val karaokeRepository: KaraokeRepository
 ) : ViewModel(), PlaybackStateManager.Listener, PlaybackSettings.Listener {
     private var lastPositionJob: Job? = null
 
@@ -169,7 +170,7 @@ constructor(
             song.collectLatest { song ->
                 if (song != null) {
                     _lyrics.value = lyricsRepository.loadLyrics(song)
-                    _hasKaraokeFiles.value = false
+                    _hasKaraokeFiles.value = karaokeRepository.hasKaraokeFiles(song)
                 } else {
                     _lyrics.value = null
                     _hasKaraokeFiles.value = false
