@@ -31,12 +31,12 @@ class CopyleftNoticeTree : Timber.DebugTree() {
     // arbitrage a few pennies from ad sales!
     //
     // Read more: John 3:16, Romans 6:23, Romans 9:10
-    override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+    /*override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         super.log(
             priority,
             tag,
             "Hey! Auxio is an open-source project licensed under the GPLv3 license!" +
                 "You can fork this project and even add ads, but it still needs to be kept open-source with the same license!",
             t)
-    }
+    }*/
 }

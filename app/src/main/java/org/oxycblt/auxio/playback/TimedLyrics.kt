@@ -55,6 +55,11 @@ data class TimedLyrics(
             while (!(eventType == XmlPullParser.END_TAG && parser.name == "p")) {
                 if (eventType == XmlPullParser.START_TAG && parser.name == "span") {
                     spans.add(readSpan(parser))
+                } else if (eventType == XmlPullParser.TEXT) {
+                    val text = parser.text.trim()
+                    if (text.isNotEmpty()) {
+                        spans.add(LyricSpan(text, startTime, endTime, true))
+                    }
                 }
                 eventType = parser.next()
             }
@@ -73,7 +78,7 @@ data class TimedLyrics(
                 }
                 eventType = parser.next()
             }
-            return LyricSpan(text, startTime, endTime)
+            return LyricSpan(text, startTime, endTime, false)
         }
     }
 }
@@ -89,17 +94,37 @@ data class LyricLine(
 data class LyricSpan(
     val text: String,
     val startTime: Long,
-    val endTime: Long
+    val endTime: Long,
+    val isFullLine: Boolean
 )
 
 fun String.parseTtmlTime(): Long {
     val parts = split(":")
-    if (parts.size != 3) return 0L
-    val hours = parts[0].toLongOrNull() ?: 0L
-    val minutes = parts[1].toLongOrNull() ?: 0L
-    val secondsWithMs = parts[2]
-    val secondsParts = secondsWithMs.split(".")
+    var hours = 0L
+    var minutes = 0L
+    val secondsStr: String
+
+    when (parts.size) {
+        3 -> { // HH:MM:SS.mmm
+            hours = parts[0].toLongOrNull() ?: 0L
+            minutes = parts[1].toLongOrNull() ?: 0L
+            secondsStr = parts[2]
+        }
+        2 -> { // MM:SS.mmm
+            minutes = parts[0].toLongOrNull() ?: 0L
+            secondsStr = parts[1]
+        }
+        else -> return 0L
+    }
+
+    val secondsParts = secondsStr.split(".")
     val seconds = secondsParts[0].toLongOrNull() ?: 0L
-    val ms = if (secondsParts.size > 1) secondsParts[1].padEnd(3, '0').take(3).toLongOrNull() ?: 0L else 0L
-    return hours * 3600000 + minutes * 60000 + seconds * 1000 + ms
+    val ms = if (secondsParts.size > 1) {
+        // Pad to ensure "03" becomes "030" and "3" becomes "300"
+        secondsParts[1].padEnd(3, '0').take(3).toLongOrNull() ?: 0L
+    } else {
+        0L
+    }
+
+    return (hours * 3600000L) + (minutes * 60000L) + (seconds * 1000L) + ms
 }
