@@ -21,7 +21,6 @@ package org.oxycblt.auxio.playback
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.LinearLayout
 import androidx.fragment.app.activityViewModels
 import com.google.android.material.R as MR
 import com.google.android.material.slider.Slider
@@ -130,6 +129,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         val binding = requireBinding()
         binding.playbackKaraokeContainer.visibility = if (showKaraoke) View.VISIBLE else View.GONE
         binding.actionShowKaraoke.apply {
+            val iconRes = if (showKaraoke) R.drawable.ic_karaoke_on_24 else R.drawable.ic_karaoke_24
+            setIconResource(iconRes)
             icon?.alpha = if (showKaraoke) 255 else 128
         }
     }
@@ -152,7 +153,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
 
         // Update menu item state if it exists
         binding.actionShowLyrics.apply {
-            // We use icon alpha to show "on/off" state for menu items usually
+            val iconRes = if (showLyrics) R.drawable.ic_lyrics_on_24 else R.drawable.ic_lyrics_24
+            setIconResource(iconRes)
             icon?.alpha = if (showLyrics) 255 else 128
         }
     }

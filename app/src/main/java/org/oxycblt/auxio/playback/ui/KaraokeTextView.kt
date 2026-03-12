@@ -29,7 +29,6 @@ import androidx.core.graphics.withClip
 import androidx.core.graphics.withSave
 import org.oxycblt.auxio.playback.LyricLine
 import org.oxycblt.auxio.playback.TimedLyrics
-import timber.log.Timber as L
 
 class KaraokeTextView @JvmOverloads constructor(
     context: Context,
@@ -80,7 +79,7 @@ class KaraokeTextView @JvmOverloads constructor(
             // 2. Manually advance the internal positionMs
             // (Assuming the music is playing)
             positionMs += elapsed
-            L.e("delta time: $elapsed")
+            //L.e("delta time: $elapsed")
 
             // 3. Redraw immediately
             invalidate()

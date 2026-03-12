@@ -479,6 +479,8 @@
     <string name="fmt_lib_total_duration">Total duration: %s</string>
     <string name="lbl_lyrics">Lyrics</string>
     <string name="lbl_karaoke">Karaoke</string>
+    <string name="lbl_camera">Camera</string>
+    <string name="desc_show_camera">Show camera</string>
     <string name="lbl_no_audio_file_found">No audio file found.</string>
 
     <plurals name="fmt_song_count">

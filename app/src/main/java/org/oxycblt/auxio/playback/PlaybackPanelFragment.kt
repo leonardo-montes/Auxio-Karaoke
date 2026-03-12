@@ -18,12 +18,28 @@
 
 package org.oxycblt.auxio.playback
 
+import android.Manifest
+import android.content.ContentValues
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewTreeObserver
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.widget.Toolbar
+import androidx.camera.core.CameraSelector
+import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import com.google.android.material.slider.Slider
@@ -71,6 +87,7 @@ class PlaybackPanelFragment :
     override fun onCreateBinding(inflater: LayoutInflater) =
         FragmentPlaybackPanelBinding.inflate(inflater)
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onBindingCreated(
         binding: FragmentPlaybackPanelBinding,
         savedInstanceState: Bundle?
@@ -88,6 +105,8 @@ class PlaybackPanelFragment :
             setNavigationOnClickListener { playbackModel.openMain() }
             setOnMenuItemClickListener(this@PlaybackPanelFragment)
         }
+        
+        binding.playbackCameraToggle?.setOnClickListener { playbackModel.toggleCamera() }
 
         binding.playbackCover.onSwipeListener = this
         binding.playbackSong.apply {
@@ -145,6 +164,7 @@ class PlaybackPanelFragment :
         collectImmediately(playbackModel.isShuffled, ::updateShuffled)
         collectImmediately(playbackModel.showLyrics, ::updateLyricsVisibility)
         collectImmediately(playbackModel.showKaraoke, ::updateKaraokeVisibility)
+        collectImmediately(playbackModel.showCamera, ::updateCameraVisibility)
         
         // Karaoke state observers
         collectImmediately(playbackModel.vocalsEnabled, ::updateVocalsState)
@@ -195,6 +215,7 @@ class PlaybackPanelFragment :
     }
 
     override fun onDestroyBinding(binding: FragmentPlaybackPanelBinding) {
+        stopCamera()
         binding.playbackSong.isSelected = false
         binding.playbackArtist.isSelected = false
         binding.playbackAlbum?.isSelected = false
@@ -207,6 +228,9 @@ class PlaybackPanelFragment :
             return true
         } else if (item.itemId == R.id.action_show_karaoke) {
             playbackModel.toggleKaraoke()
+            return true
+        } else if (item.itemId == R.id.playback_camera_toggle) {
+            playbackModel.toggleCamera()
             return true
         }
 
@@ -301,6 +325,8 @@ class PlaybackPanelFragment :
         // Update menu item state if it exists
         binding.playbackToolbar.menu.findItem(R.id.action_show_lyrics)?.apply {
             // We use icon alpha to show "on/off" state for menu items usually
+            val iconRes = if (showLyrics) R.drawable.ic_lyrics_on_24 else R.drawable.ic_lyrics_24
+            setIcon(iconRes)
             icon?.alpha = if (showLyrics) 255 else 128
         }
     }
@@ -311,8 +337,155 @@ class PlaybackPanelFragment :
 
         // Update menu item state if it exists
         binding.playbackToolbar.menu.findItem(R.id.action_show_karaoke)?.apply {
+            val iconRes = if (showKaraoke) R.drawable.ic_karaoke_on_24 else R.drawable.ic_karaoke_24
+            setIcon(iconRes)
             icon?.alpha = if (showKaraoke) 255 else 128
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+        val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+
+        if (cameraGranted && audioGranted) {
+            startCamera()
+        } else {
+            L.w("Camera or Audio permission denied by user")
+            // Revert the UI state since we can't actually start the camera
+            if (playbackModel.showCamera.value) {
+                playbackModel.toggleCamera()
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateCameraVisibility(showCamera: Boolean) {
+        val binding = requireBinding() // Use requireBinding() instead of binding?
+
+        if (showCamera) {
+            val permissions = arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.RECORD_AUDIO
+            )
+
+            val allGranted = permissions.all {
+                ContextCompat.checkSelfPermission(requireContext(), it) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+
+            if (allGranted) {
+                startCamera()
+            } else {
+                // 1. Request the permissions
+                requestPermissionLauncher.launch(permissions)
+
+                // 2. IMPORTANT: Do NOT toggle the model back yet.
+                // Let the requestPermissionLauncher handle the result.
+                // If you toggle here, the UI state and permission state get out of sync.
+            }
+        } else {
+            stopCamera()
+        }
+
+        // Fix the menu icon update
+        binding.playbackCameraToggle?.apply {
+            val iconRes = if (showCamera) R.drawable.ic_camera_on_24 else R.drawable.ic_camera_24
+            setIconResource(iconRes)
+            icon?.alpha = if (showCamera) 255 else 128
+        }
+    }
+
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var recording: androidx.camera.video.Recording? = null
+    private var cameraProvider: androidx.camera.lifecycle.ProcessCameraProvider? = null
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun startCamera() {
+        val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(requireContext())
+        cameraProviderFuture.addListener({
+            val provider = cameraProviderFuture.get()
+            this.cameraProvider = provider
+
+            // VideoCapture use case
+            val recorder = Recorder.Builder()
+                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .build()
+            videoCapture = VideoCapture.withOutput(recorder)
+
+            // Select front camera
+            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+
+            try {
+                cameraProvider?.unbindAll()
+                // Binding only videoCapture (preview is null)
+                cameraProvider?.bindToLifecycle(viewLifecycleOwner, cameraSelector, videoCapture)
+
+                // Inline permission check to satisfy the IDE/Compiler
+                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    startRecording()
+                } else {
+                    L.e("Cannot start recording: RECORD_AUDIO permission not granted in listener")
+                }
+            } catch (e: Exception) {
+                L.e(e, "Use case binding failed")
+            }
+        }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    private fun startRecording() {
+        val videoCapture = this.videoCapture ?: return
+
+        val name = "Auxio-Recording-${System.currentTimeMillis()}.mp4"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+
+            // Change from "Movies/Auxio-Captures" to "DCIM/Camera"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Video.Media.RELATIVE_PATH, "DCIM/Camera")
+            }
+        }
+
+        val mediaStoreOutputOptions = MediaStoreOutputOptions
+            .Builder(requireContext().contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            .setContentValues(contentValues)
+            .build()
+
+        L.e("STARTED RECORDING!!!")
+
+        recording = videoCapture.output
+            .prepareRecording(requireContext(), mediaStoreOutputOptions)
+            .withAudioEnabled()
+            .start(ContextCompat.getMainExecutor(requireContext())) { recordEvent ->
+                when (recordEvent) {
+                    is VideoRecordEvent.Start -> {
+                        L.d("Recording Started")
+                    }
+                    is VideoRecordEvent.Finalize -> {
+                        if (!recordEvent.hasError()) {
+                            val msg = "Video capture succeeded: ${recordEvent.outputResults.outputUri}"
+                            L.d(msg)
+                        } else {
+                            recording?.close()
+                            recording = null
+                            L.e("Video capture ends with error: ${recordEvent.error}")
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun stopCamera() {
+        recording?.stop()
+        recording = null
+        cameraProvider?.unbindAll()
+        L.d("Camera hardware released")
+        // Unbind camera if needed, or just let lifecycle handle it
     }
 
     private fun updateVocalsState(enabled: Boolean) {

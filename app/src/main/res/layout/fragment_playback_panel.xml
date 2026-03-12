@@ -18,7 +18,18 @@
         app:title="@string/lbl_playback"
         app:titleCentered="true"
         app:titleTextAppearance="@style/TextAppearance.Auxio.LabelLarge"
-        tools:subtitle="@string/lbl_all_songs" />
+        tools:subtitle="@string/lbl_all_songs">
+
+        <org.oxycblt.auxio.ui.RippleFixMaterialButton
+            android:id="@+id/playback_camera_toggle"
+            style="@style/Widget.Auxio.Button.Icon.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:contentDescription="@string/desc_show_camera"
+            app:icon="@drawable/ic_camera_24" />
+
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/playback_top_barrier"

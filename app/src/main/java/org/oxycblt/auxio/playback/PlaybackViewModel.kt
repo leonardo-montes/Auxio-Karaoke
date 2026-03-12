@@ -20,7 +20,6 @@ package org.oxycblt.auxio.playback
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.application
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -112,6 +111,11 @@ constructor(
     /** Whether to show the karaoke panel. */
     val showKaraoke: StateFlow<Boolean>
         get() = _showKaraoke
+
+    private val _showCamera = MutableStateFlow(false)
+    /** Whether to show the camera view. */
+    val showCamera: StateFlow<Boolean>
+        get() = _showCamera
 
     private val _vocalsEnabled = MutableStateFlow(true)
     /** Whether vocals are enabled in karaoke mode. */
@@ -798,6 +802,12 @@ constructor(
     fun toggleKaraoke() {
         L.d("Toggling karaoke state")
         _showKaraoke.value = !_showKaraoke.value
+    }
+
+    /** Toggle [showCamera] (ex. from on to off) */
+    fun toggleCamera() {
+        L.d("Toggling camera state")
+        _showCamera.value = !_showCamera.value
     }
 
     /** Toggle [vocalsEnabled] (ex. from on to off) */
