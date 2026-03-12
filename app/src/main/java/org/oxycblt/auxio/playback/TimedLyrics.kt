@@ -58,7 +58,7 @@ data class TimedLyrics(
                 } else if (eventType == XmlPullParser.TEXT) {
                     val text = parser.text.trim()
                     if (text.isNotEmpty()) {
-                        spans.add(LyricSpan(text, startTime, endTime, true))
+                        spans.add(LyricSpan(text, textToList(text), startTime, endTime, true))
                     }
                 }
                 eventType = parser.next()
@@ -78,9 +78,13 @@ data class TimedLyrics(
                 }
                 eventType = parser.next()
             }
-            return LyricSpan(text, startTime, endTime, false)
+            return LyricSpan(text, textToList(text), startTime, endTime, false)
         }
     }
+}
+
+fun textToList(text: String): List<String> {
+    return text.split(Regex("(?<=\\s)")).filter { it.isNotBlank() }
 }
 
 data class LyricLine(
@@ -93,6 +97,7 @@ data class LyricLine(
 
 data class LyricSpan(
     val text: String,
+    val parts: List<String>,
     val startTime: Long,
     val endTime: Long,
     val isFullLine: Boolean

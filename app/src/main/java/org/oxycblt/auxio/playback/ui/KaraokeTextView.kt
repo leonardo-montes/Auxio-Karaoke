@@ -197,11 +197,7 @@ class KaraokeTextView @JvmOverloads constructor(
             // Calculate line width
             var totalWidth = 0.0f;
             for (span in line.spans) {
-                val parts = if (span.text.isNotBlank()) span.text.split(Regex("(?<=\\s)")) else listOf(span.text)
-                for (part in parts) {
-                    if (part.isEmpty())
-                        continue
-
+                for (part in span.parts) {
                     val currentSpanWidth = activePaint.measureText(part)
 
                     if (totalWidth + currentSpanWidth > canvas.width - 80.0f) {
@@ -226,11 +222,7 @@ class KaraokeTextView @JvmOverloads constructor(
         var isVisible = isLineVisible(canvas, y + verticalOffset);
         //L.e("line height: ${y} - ${line.text}")
         for (span in timedLyrics!!.lines[lineId].spans) {
-            val parts = if (span.text.isNotBlank()) span.text.split(Regex("(?<=\\s)")) else listOf(span.text)
-            for (part in parts) {
-                if (part.isEmpty())
-                    continue
-
+            for (part in span.parts) {
                 //L.e("'${span.text}' (${parts.count()}) - '$part'")
                 val currentSpanWidth = activePaint.measureText(part)
 
