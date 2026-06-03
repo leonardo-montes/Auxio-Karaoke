@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.oxycblt.auxio.music.MusicSettings
 import org.oxycblt.musikr.Song
 import org.oxycblt.musikr.fs.Volume
+import timber.log.Timber as L
 
 /**
  * Repository for loading lyrics from the filesystem.
@@ -48,6 +49,7 @@ class LyricsRepository @Inject constructor(
      * @return The [TimedLyrics] if found and parsed successfully, null otherwise.
      */
     suspend fun loadLyrics(song: Song): TimedLyrics? = withContext(Dispatchers.IO) {
+        L.d("Loading lyrics for ${song.name.raw}")
         val content = tryLoadLyrics(song) ?: return@withContext null
         TimedLyrics.parse(content)
     }

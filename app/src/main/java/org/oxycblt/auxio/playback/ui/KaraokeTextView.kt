@@ -22,13 +22,18 @@ import android.content.Context
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.text.TextPaint
 import android.util.AttributeSet
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.animation.AnimationUtils
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.graphics.withClip
 import androidx.core.graphics.withSave
 import org.oxycblt.auxio.playback.LyricLine
+import org.oxycblt.auxio.playback.LyricSpan
 import org.oxycblt.auxio.playback.TimedLyrics
+import kotlin.math.max
 import timber.log.Timber as L
 
 class KaraokeTextView @JvmOverloads constructor(
@@ -100,7 +105,9 @@ class KaraokeTextView @JvmOverloads constructor(
     }
 
     fun setTimedLyrics(timedLyrics: TimedLyrics?) {
+        L.d("AUXIOKE: Setting timed lyrics")
         this.timedLyrics = timedLyrics
+        userScrollOffset = 0f
         postInvalidateOnAnimation()
     }
 
@@ -115,12 +122,57 @@ class KaraokeTextView @JvmOverloads constructor(
         return a + (b - a) * t
     }
 
-    override fun onDraw(canvas: Canvas) {
+    private var userScrollOffset: Float = 0.0f
+    private val gestureDetector =
+        GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float
+            ): Boolean {
+                // This tells parent views not to intercept this touch stream
+                parent?.requestDisallowInterceptTouchEvent(true)
+
+                userScrollOffset -= distanceY
+                invalidate()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                userScrollOffset = 0f // Reset scroll on double tap
+                invalidate()
+                return true
+            }
+        })
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
         if (timedLyrics == null || timedLyrics!!.lines.isEmpty()) {
+            return super.onTouchEvent(event)
+        }
+        return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        // Early-out checks
+        if (timedLyrics == null || timedLyrics!!.lines.isEmpty()) {
+            L.e("AUXIOKE: no lyrics (weird)")
+            if (timedLyrics == null)
+                L.e("AUXIOKE: timedLyrics is null")
+            else if (timedLyrics!!.lines.isEmpty())
+                L.e("AUXIOKE: timedLyrics is empty")
+
+            if (isAnimating && !isPlaying) {
+                stopAnimation()
+            }
+
             super.onDraw(canvas)
             return
         }
 
+        // Init text
         activePaint.textSize = textSize
         activePaint.typeface = typeface
         activePaint.color = currentTextColor
@@ -130,8 +182,10 @@ class KaraokeTextView @JvmOverloads constructor(
         inactivePaint.color = currentTextColor
         inactivePaint.alpha = 128 // 50% opacity for the "background" text
 
-        val lineOffset = lineHeight / 2.0f
+        // Init lyrics
+        initLyrics(canvas)
 
+        // Cache
         val now = AnimationUtils.currentAnimationTimeMillis()
 
         // Get current line id
@@ -143,15 +197,16 @@ class KaraokeTextView @JvmOverloads constructor(
                 ++newLyricLineId
             }
         }
+
+        //var getHeightMs = 0.0
         if (newLyricLineId != lyricLineId) {
             prevLyricLineId = lyricLineId
             lyricLineId = newLyricLineId
             lastLyricLineIdChangeTime = now
             lastVerticalOffset = verticalOffset
-            verticalOffset = -getLineHeight(canvas, timedLyrics!!.lines, lineOffset, lyricLineId)
+            verticalOffset = -getLineHeight(canvas, timedLyrics!!.lines, lineHeight / 2.0f, lyricLineId)
             lastLyricLineIdTime = 0.0f;
         }
-        //L.e("vertical offset: $verticalOffset")
 
         // Stop animation (for example, when we just change the time while playing is paused)
         if (lastLyricLineIdTime >= 0.9999f && isAnimating && !isPlaying) {
@@ -165,258 +220,197 @@ class KaraokeTextView @JvmOverloads constructor(
         else if (lastLyricLineIdTime < 0.0f)
             lastLyricLineIdTime = 0.0f
 
-        //L.e("isAnimating: $isAnimating")
-
-        val x = 40.0f
-        val y = baseline.toFloat()
-
         // Draw a line (multi-line)
+        val y = baseline.toFloat()
+        val yStartScroll = userScrollOffset
         val yStartT = lastLyricLineIdTime * lastLyricLineIdTime * (3f - 2f * lastLyricLineIdTime)
-        val yStart = lerp(lastVerticalOffset, verticalOffset,yStartT)
-        var yOffset = 0.0f
+        val yStart = lerp(lastVerticalOffset, verticalOffset,yStartT) + yStartScroll
 
-        //L.e("Y OFFSET: $yOffset")
-        for (i in 0 until timedLyrics!!.lines.count()) {
-            if (timedLyrics!!.lines[i].spans.count() == 1 && timedLyrics!!.lines[i].spans[0].isFullLine) {
-                yOffset += drawFullLine(canvas, i, x, y + yStart + yOffset, lineOffset)
-            } else {
-                yOffset += drawLine(canvas, i, x, y + yStart + yOffset, lineOffset)
+         for (lineId in 0 until timedLyrics!!.lines.count()) {
+            val line = timedLyrics!!.lines[lineId]
+            val yOffset = y + yStart
+            if (isLineVisible(canvas, yOffset, line)) {
+                drawLine(canvas, lineId, yOffset, line.spans.count() == 1 && line.spans[0].isFullLine)
             }
+        }
+    }
+
+    fun initLyrics(canvas: Canvas) {
+        var lineY = 0.0f
+
+        // Iterate through each line
+        for (line in timedLyrics!!.lines) {
+            // Setup the line's rect
+            line.rect.x = 40.0f
+            line.rect.y = lineY
+
+            var skipSpanId = 0
+            var skipPartId = 0
+
+            // Iterate through each span
+            var spanX = line.rect.x
+            for (spanId in 0 until line.spans.size) {
+                val span = line.spans[spanId]
+
+                // Early-out if the parts have already been initialized
+                if (span.partsInitialized)
+                    return;
+
+                // Setup the span's rect
+                span.rect.x = spanX
+                span.rect.y = lineY
+
+                // Iterate through each parts of the span (a span can be a word to an entire line)
+                var partX = spanX
+                for (partId in 0 until span.parts.size) {
+                    val part = span.parts[partId]
+
+                    // Get part's width
+                    val width = activePaint.measureText(part.text)
+
+                    // Get the actual full word width
+                    var currentSpanWidth = 0.0f
+                    if (spanId >= skipSpanId && partId >= skipPartId) {
+                        val fullWordWidth = getFullWordWidth(line.spans, spanId, partId)
+                        currentSpanWidth = fullWordWidth.first
+                        skipSpanId = fullWordWidth.second
+                        skipPartId = fullWordWidth.third
+                    } else {
+                        currentSpanWidth = 0.0f
+                    }
+
+                    // Check if this is too long and if we need to return to the line
+                    if (partX + currentSpanWidth > canvas.width - 80.0f) {
+                        span.rect.x = line.rect.x
+                        span.rect.width += spanX
+
+                        spanX = span.rect.x
+                        partX = spanX
+                        lineY += lineHeight
+                    }
+
+                    // Set the rect data
+                    part.rect.x = partX
+                    part.rect.y = lineY
+                    part.rect.width = width
+                    part.rect.height = lineHeight.toFloat()
+
+                    // Update the span's rect
+                    span.rect.width = max(span.rect.width, partX + width)
+                    span.rect.height = max(span.rect.height, lineY - span.rect.y)
+
+                    // Move right
+                    partX += width
+                    spanX += width
+                }
+
+                // Update the line's rect
+                line.rect.width = max(line.rect.width, span.rect.x + span.rect.width)
+                line.rect.height = max(line.rect.height, lineY - line.rect.y)
+
+                // Mark the span as initialized
+                span.partsInitialized = true
+            }
+
+            // Return to line
+            lineY += lineHeight + (lineHeight / 2.0f)
         }
     }
 
     fun getLineHeight(canvas: Canvas, lines: List<LyricLine>, lineOffset: Float, targetId: Int): Float {
         var verticalOffset = canvas.height / 4.0f;
-        for (i in 0 until lines.count()) {
-            if (i == lyricLineId) {
-                break
-            }
-
-            val line = lines[i]
-
-            // Calculate line width
-            var totalWidth = 0.0f;
-            for (span in line.spans) {
-                for (part in span.parts) {
-                    val currentSpanWidth = activePaint.measureText(part)
-
-                    if (totalWidth + currentSpanWidth > canvas.width - 80.0f) {
-                        totalWidth = currentSpanWidth
-                        verticalOffset += lineHeight
-                    } else {
-                        totalWidth += currentSpanWidth
-                    }
-                }
-            }
-            verticalOffset += lineHeight + lineOffset
+        if (lyricLineId >= 0 && lyricLineId < lines.size) {
+            verticalOffset += lines[lyricLineId].rect.y
         }
         return verticalOffset
     }
 
-    fun drawFullLine(canvas: Canvas, lineId: Int, x: Float, y: Float, lineOffset: Float): Float {
+    fun getFullWordWidth (spans: List<LyricSpan>, spanId: Int, partId: Int): Triple<Float, Int, Int> {
+        var totalWidth = 0.0f
+        var spanIdOffset = spanId
+        var partIdOffset = partId
+        for (i in spanId until spans.count()) {
+            val span = spans[i]
+            partIdOffset = if (i == spanId) partId else 0
+            for (j in partId until span.parts.count()) {
+                val part = span.parts[j]
+
+                totalWidth += activePaint.measureText(part.text)
+
+                // Improved boundary check:
+                // 1. Check if the part ends with whitespace or a punctuation break
+                // 2. Check if the next part exists and starts with a space
+                if (part.text.endsWith(" ") || part.text.endsWith("-") || part.text.endsWith("\n")) {
+                    return Triple(totalWidth, spanIdOffset, partIdOffset)
+                }
+
+                ++partIdOffset
+            }
+            ++spanIdOffset
+        }
+
+        return Triple(totalWidth, spanIdOffset, partIdOffset)
+    }
+
+    fun isLineVisible(canvas: Canvas, yOffset: Float, line: LyricLine): Boolean {
+        return line.rect.y + line.rect.height + yOffset > 0.0f && line.rect.y - line.rect.height + yOffset < canvas.height
+    }
+
+    fun drawLine(canvas: Canvas, lineId: Int, yOffset: Float, allowWordByWord: Boolean) {
         val line = timedLyrics!!.lines[lineId]
-        // Draw each line
-        var totalWidth = 0.0f;
-        var verticalOffset = 0.0f;
-        var text = ""
-        var isVisible = isLineVisible(canvas, y + verticalOffset);
-        //L.e("line height: ${y} - ${line.text}")
-        for (span in timedLyrics!!.lines[lineId].spans) {
+
+        // Calculate delta
+        val delta: Int = lineId - lyricLineId
+
+        // Draw text
+        if (delta > 0) {
+            drawLineFull(canvas, line, yOffset, inactivePaint) // Inactive text
+        } else if (delta >= -1 && allowWordByWord) {
+            drawLineWord(canvas, line, yOffset) // Currently played text
+        } else {
+            drawLineFull(canvas, line, yOffset, activePaint) // Already played text
+        }
+    }
+
+    fun drawLineFull(canvas: Canvas, line:LyricLine, yOffset:Float, paint: Paint) {
+        for(span in line.spans) {
             for (part in span.parts) {
-                //L.e("'${span.text}' (${parts.count()}) - '$part'")
-                val currentSpanWidth = activePaint.measureText(part)
-
-                if (totalWidth + currentSpanWidth > canvas.width - 80.0f) {
-                    val willBeVisible = isLineVisible(canvas, y + verticalOffset + lineHeight)
-                    if (isVisible || willBeVisible) {
-                        if (isVisible)
-                            drawLineFull(
-                                canvas,
-                                lineId,
-                                text,
-                                x,
-                                y + verticalOffset
-                            )
-                    }
-                    text = part
-                    totalWidth = currentSpanWidth
-                    verticalOffset += lineHeight
-                    isVisible = willBeVisible
-                } else {
-                    text += part
-                    totalWidth += currentSpanWidth
-                }
+                canvas.drawText(part.text, part.rect.x, part.rect.y + yOffset, paint)
             }
         }
-        if (isVisible)
-            drawLineFull(canvas, lineId, text, x, y + verticalOffset)
-
-        return verticalOffset + lineHeight + lineOffset
     }
 
-    fun drawLine(canvas: Canvas, lineId: Int, x: Float, y: Float, lineOffset: Float): Float {
-        val line = timedLyrics!!.lines[lineId]
-        // Draw each line
-        var totalWidth = 0.0f;
-        var verticalOffset = 0.0f;
-        var text = ""
-        var lastClipWidth = 0.0f
-        var isVisible = isLineVisible(canvas, y + verticalOffset);
-        //L.e("line height: ${y} - ${line.text}")
-        for (span in timedLyrics!!.lines[lineId].spans) {
-            val parts = if (span.text.isNotBlank()) span.text.split(Regex("(?<=\\s)")) else listOf(span.text)
-            for (part in parts) {
-                if (part.isEmpty())
-                    continue
+    fun drawLineWord(canvas: Canvas, line:LyricLine, yOffset:Float) {
+        for(span in line.spans) {
+            for (part in span.parts) {
+                // Is full?
+                val isFull = positionMs >= span.endTime || positionMs <= span.startTime
 
-                //L.e("'${span.text}' (${parts.count()}) - '$part'")
-                val currentSpanWidth = activePaint.measureText(part)
-
-                if (totalWidth + currentSpanWidth > canvas.width - 80.0f) {
-                    val willBeVisible = isLineVisible(canvas, y + verticalOffset + lineHeight)
-                    if (isVisible || willBeVisible) {
-                        val clipWidth = when {
-                            positionMs >= span.endTime -> currentSpanWidth
-                            positionMs <= span.startTime -> 0f
-                            else -> {
-                                val progress =
-                                    (positionMs - span.startTime).toFloat() / (span.endTime - span.startTime).toFloat()
-                                currentSpanWidth * progress
-                            }
-                        }
-                        if (isVisible)
-                            drawLine(
-                                canvas,
-                                lineId,
-                                text,
-                                x,
-                                y + verticalOffset,
-                                totalWidth,
-                                lastClipWidth
-                            )
-                        lastClipWidth = clipWidth
-                    }
-                    text = part
-                    totalWidth = currentSpanWidth
-                    verticalOffset += lineHeight
-                    isVisible = willBeVisible
+                // Draw full word as usual
+                if (isFull) {
+                    val paint = if (positionMs <= span.startTime) inactivePaint else activePaint
+                    canvas.drawText(part.text, part.rect.x, part.rect.y + yOffset, paint)
                 } else {
-                    text += part
-                    totalWidth += currentSpanWidth
-                    if (isVisible) {
-                        lastClipWidth += when {
-                            positionMs >= span.endTime -> currentSpanWidth
-                            positionMs <= span.startTime -> 0f
-                            else -> {
-                                val progress =
-                                    (positionMs - span.startTime).toFloat() / (span.endTime - span.startTime).toFloat()
-                                currentSpanWidth * progress
+                    // Draw clipped word
+                    canvas.withSave {
+                        // Draw background inactive word
+                        canvas.drawText(part.text, part.rect.x, part.rect.y + yOffset, inactivePaint)
+
+                        // Draw clipped line
+                        val progress = (positionMs - span.startTime).toFloat() / (span.endTime - span.startTime).toFloat()
+                        if (part.rect.width * progress > 0) {
+                            activePaint.maskFilter = null
+                            withClip(
+                                part.rect.x,
+                                part.rect.y + yOffset - part.rect.height,
+                                part.rect.x + part.rect.width * progress,
+                                part.rect.y + yOffset + part.rect.height
+                            ) {
+                                drawText(part.text, part.rect.x, part.rect.y + yOffset, activePaint)
                             }
                         }
                     }
                 }
-            }
-        }
-        if (isVisible)
-            drawLine(canvas, lineId, text, x, y + verticalOffset, totalWidth, lastClipWidth)
-
-        return verticalOffset + lineHeight + lineOffset
-    }
-
-    fun isLineVisible(canvas: Canvas, y: Float): Boolean {
-        //L.e("canvas height ${canvas.height}")
-        val start = 0.0f;
-        return y >= start && y < start + canvas.height + lineHeight;
-    }
-
-    fun drawLine(canvas: Canvas, lineId: Int, text: String, x: Float, y: Float, width: Float, clipWidth: Float) {
-        // Calculate delta
-        val delta: Int = lineId - lyricLineId
-        var deltaT: Float =
-            lerp((lineId - prevLyricLineId).toFloat(), delta.toFloat(), lastLyricLineIdTime)
-
-        // Draw inactive (background) text
-        if (delta >= 0) {
-            if (delta > 0) {
-                deltaT = if (deltaT < 0.01f) 0.01f else deltaT
-                inactivePaint.maskFilter = BlurMaskFilter(deltaT * 4.0f, BlurMaskFilter.Blur.NORMAL)
-                canvas.drawText(text, x, y, inactivePaint)
-            } else {
-                canvas.withSave {
-                    // Draw clipped line
-                    inactivePaint.maskFilter = null
-                    val totalWidth = inactivePaint.measureText(text)
-                    if (clipWidth < totalWidth) {
-                        withClip(
-                            x + clipWidth,
-                            0f,
-                            x + totalWidth,
-                            height.toFloat()
-                        ) {
-                            drawText(text, x, y, inactivePaint)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Draw active text
-        if (delta <= 0) {
-            if (delta < 0) {
-                deltaT = if (deltaT > -0.01f) -0.01f else deltaT
-                //L.e("delta $deltaT")
-                activePaint.maskFilter = BlurMaskFilter(-deltaT * 8.0f, BlurMaskFilter.Blur.NORMAL)
-                canvas.drawText(text, x, y, activePaint)
-            } else {
-                canvas.withSave {
-                    // Draw clipped line
-                    if (clipWidth > 0) {
-                        activePaint.maskFilter = null
-                        withClip(
-                            x,
-                            0f,
-                            x + clipWidth,
-                            height.toFloat()
-                        ) {
-                            drawText(text, x, y, activePaint)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fun drawLineFull(canvas: Canvas, lineId: Int, text: String, x: Float, y: Float) {
-        // Calculate delta
-        val delta: Int = lineId - lyricLineId
-        var deltaT: Float =
-            lerp((lineId - prevLyricLineId).toFloat(), delta.toFloat(), lastLyricLineIdTime)
-
-        // Draw inactive (background) text
-        if (delta >= 0) {
-            if (delta > 0) {
-                deltaT = if (deltaT < 0.01f) 0.01f else deltaT
-                inactivePaint.maskFilter =
-                    BlurMaskFilter(deltaT * 4.0f, BlurMaskFilter.Blur.NORMAL)
-                canvas.drawText(text, x, y, inactivePaint)
-            } else {
-                // Draw clipped line
-                inactivePaint.maskFilter = null
-                canvas.drawText(text, x, y, inactivePaint)
-            }
-        }
-
-        // Draw active text
-        if (delta <= 0) {
-            if (delta < 0) {
-                deltaT = if (deltaT > -0.01f) -0.01f else deltaT
-                //L.e("delta $deltaT")
-                activePaint.maskFilter =
-                    BlurMaskFilter(-deltaT * 8.0f, BlurMaskFilter.Blur.NORMAL)
-                canvas.drawText(text, x, y, activePaint)
-            } else {
-                activePaint.maskFilter = null
-                canvas.drawText(text, x, y, activePaint)
             }
         }
     }

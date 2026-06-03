@@ -144,6 +144,7 @@ class PlaybackPanelFragment :
         binding.karaokeVocalsVolume?.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
+                L.d("AUXIOKE: Updating vocals volume: ${slider.value}")
                 playbackModel.setVocalsVolume(slider.value.toInt())
             }
         })
@@ -151,6 +152,7 @@ class PlaybackPanelFragment :
         binding.karaokeAccompanimentVolume?.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
+                L.d("AUXIOKE: Updating accompaniment volume: ${slider.value}")
                 playbackModel.setAccompanimentVolume(slider.value.toInt())
             }
         })
@@ -285,7 +287,8 @@ class PlaybackPanelFragment :
         binding.playbackSeekBar?.positionDs = positionDs
         
         val positionMs = positionDs.dsToMs() + 200 // 200ms offset
-        if (playbackModel.lyrics.value != null) {
+        if (playbackModel.lyrics.value != null && playbackModel.showLyrics.value) {
+            L.d("AUXIOKE: Updating lyrics position: $positionMs")
             binding.playbackLyrics.setPosition(positionMs)
             if (!binding.playbackPlayPause.isActivated) {
                 binding.playbackLyrics.startAnimation(false)
@@ -304,6 +307,7 @@ class PlaybackPanelFragment :
         requireBinding().playbackPlayPause.isActivated = isPlaying
 
         // START or STOP the high-frequency fluid timer
+        L.d("AUXIOKE: Updating playing state: $isPlaying")
         val binding = requireBinding()
         if (isPlaying) {
             binding.playbackLyrics.startAnimation(true)
@@ -317,6 +321,8 @@ class PlaybackPanelFragment :
     }
 
     private fun updateLyricsVisibility(showLyrics: Boolean) {
+        L.d("AUXIOKE: Updating lyrics visibility: $showLyrics")
+
         val binding = requireBinding()
         binding.playbackCover.visibility = if (showLyrics) View.INVISIBLE else View.VISIBLE
         binding.playbackLyrics.visibility = if (showLyrics) View.VISIBLE else View.GONE
@@ -332,6 +338,8 @@ class PlaybackPanelFragment :
     }
 
     private fun updateKaraokeVisibility(showKaraoke: Boolean) {
+        L.d("AUXIOKE: Updating karaoke visibility: $showKaraoke")
+
         val binding = requireBinding()
         binding.playbackKaraokeContainer?.visibility = if (showKaraoke) View.VISIBLE else View.GONE
 
@@ -353,7 +361,7 @@ class PlaybackPanelFragment :
         if (cameraGranted && audioGranted) {
             startCamera()
         } else {
-            L.w("Camera or Audio permission denied by user")
+            L.w("AUXIOKE: Camera or Audio permission denied by user")
             // Revert the UI state since we can't actually start the camera
             if (playbackModel.showCamera.value) {
                 playbackModel.toggleCamera()
@@ -363,6 +371,8 @@ class PlaybackPanelFragment :
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun updateCameraVisibility(showCamera: Boolean) {
+        L.d("AUXIOKE: Updating camera visibility: $showCamera")
+
         val binding = requireBinding() // Use requireBinding() instead of binding?
 
         if (showCamera) {
@@ -404,6 +414,8 @@ class PlaybackPanelFragment :
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startCamera() {
+        L.d("AUXIOKE: Starting camera")
+
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
             val provider = cameraProviderFuture.get()
@@ -428,16 +440,18 @@ class PlaybackPanelFragment :
                     android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     startRecording()
                 } else {
-                    L.e("Cannot start recording: RECORD_AUDIO permission not granted in listener")
+                    L.e("AUXIOKE: Cannot start recording: RECORD_AUDIO permission not granted in listener")
                 }
             } catch (e: Exception) {
-                L.e(e, "Use case binding failed")
+                L.e(e, "AUXIOKE: Use case binding failed")
             }
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun startRecording() {
+        L.d("AUXIOKE: Starting recording")
+
         val videoCapture = this.videoCapture ?: return
 
         val name = "Auxio-Recording-${System.currentTimeMillis()}.mp4"
@@ -456,24 +470,22 @@ class PlaybackPanelFragment :
             .setContentValues(contentValues)
             .build()
 
-        L.e("STARTED RECORDING!!!")
-
         recording = videoCapture.output
             .prepareRecording(requireContext(), mediaStoreOutputOptions)
             .withAudioEnabled()
             .start(ContextCompat.getMainExecutor(requireContext())) { recordEvent ->
                 when (recordEvent) {
                     is VideoRecordEvent.Start -> {
-                        L.d("Recording Started")
+                        L.d("AUXIOKE: Recording Started")
                     }
                     is VideoRecordEvent.Finalize -> {
                         if (!recordEvent.hasError()) {
-                            val msg = "Video capture succeeded: ${recordEvent.outputResults.outputUri}"
+                            val msg = "AUXIOKE: Video capture succeeded: ${recordEvent.outputResults.outputUri}"
                             L.d(msg)
                         } else {
                             recording?.close()
                             recording = null
-                            L.e("Video capture ends with error: ${recordEvent.error}")
+                            L.e("AUXIOKE: Video capture ends with error: ${recordEvent.error}")
                         }
                     }
                 }
@@ -484,11 +496,13 @@ class PlaybackPanelFragment :
         recording?.stop()
         recording = null
         cameraProvider?.unbindAll()
-        L.d("Camera hardware released")
+        L.d("AUXIOKE: Camera hardware released")
         // Unbind camera if needed, or just let lifecycle handle it
     }
 
     private fun updateVocalsState(enabled: Boolean) {
+        L.d("AUXIOKE: Updating vocals state: $enabled")
+
         val binding = requireBinding()
         binding.karaokeVocalsToggle?.icon?.alpha = if (enabled) 255 else 128
         binding.karaokeVocalsVolume?.alpha = if (enabled) 1.0f else 0.5f
@@ -496,6 +510,8 @@ class PlaybackPanelFragment :
     }
 
     private fun updateAccompanimentState(enabled: Boolean) {
+        L.d("AUXIOKE: Updating accompaniment state: $enabled")
+
         val binding = requireBinding()
         binding.karaokeAccompanimentToggle?.icon?.alpha = if (enabled) 255 else 128
         binding.karaokeAccompanimentVolume?.alpha = if (enabled) 1.0f else 0.5f
@@ -503,12 +519,20 @@ class PlaybackPanelFragment :
     }
 
     private fun updateKaraokeFilesState(hasFiles: Boolean) {
+        L.d("AUXIOKE: Updating karaoke files state: $hasFiles")
+
         val binding = requireBinding()
         binding.karaokeControls?.visibility = if (hasFiles) View.VISIBLE else View.GONE
         binding.karaokeEmptyText?.visibility = if (hasFiles) View.GONE else View.VISIBLE
     }
 
     private fun updateLyrics(lyrics: TimedLyrics?) {
+        if (!playbackModel.showLyrics.value) {
+            return;
+        }
+
+        L.d("AUXIOKE: Updating lyrics")
+
         val binding = requireBinding()
         if (lyrics != null) {
             binding.playbackLyrics.setTimedLyrics(lyrics)

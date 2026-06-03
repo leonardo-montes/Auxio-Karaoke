@@ -56,14 +56,22 @@ data class TimedLyrics(
                 if (eventType == XmlPullParser.START_TAG && parser.name == "span") {
                     spans.add(readSpan(parser))
                 } else if (eventType == XmlPullParser.TEXT) {
-                    val text = parser.text.trim()
-                    if (text.isNotEmpty()) {
-                        spans.add(LyricSpan(text, textToList(text), startTime, endTime, true))
+                    val text = parser.text
+                    if (text.isNotBlank()) {
+                        val parts = textToList(text.trim())
+                        spans.add(LyricSpan(text.trim(), Rect(-1f,-1f,-1f,-1f), parts, false, startTime, endTime, true))
+                    } else if (text.isNotEmpty() && spans.isNotEmpty()) {
+                        val lastSpan = spans.last()
+                        val newText = lastSpan.text + text
+                        spans[spans.size - 1] = lastSpan.copy(
+                            text = newText,
+                            parts = textToList(newText)
+                        )
                     }
                 }
                 eventType = parser.next()
             }
-            return LyricLine(spans, startTime, endTime)
+            return LyricLine(spans, Rect(-1f,-1f,-1f,-1f), startTime, endTime)
         }
 
         private fun readSpan(parser: XmlPullParser): LyricSpan {
@@ -74,30 +82,49 @@ data class TimedLyrics(
             var eventType = parser.next()
             while (!(eventType == XmlPullParser.END_TAG && parser.name == "span")) {
                 if (eventType == XmlPullParser.TEXT) {
-                    text = parser.text
+                    text += parser.text
                 }
                 eventType = parser.next()
             }
-            return LyricSpan(text, textToList(text), startTime, endTime, false)
+            val parts = textToList(text)
+            return LyricSpan(text, Rect(-1f,-1f,-1f,-1f), parts, false, startTime, endTime, false)
         }
     }
 }
 
-fun textToList(text: String): List<String> {
-    return text.split(Regex("(?<=\\s)")).filter { it.isNotBlank() }
+fun textToList(text: String): List<LyricSpanPart> {
+    val words = text.split(Regex("(?<=\\s)")).filter { it.isNotEmpty() }
+    return words.map { word ->
+        LyricSpanPart(word, Rect(-1f, -1f, -1f, -1f))
+    }
 }
 
 data class LyricLine(
     val spans: List<LyricSpan>,
+    val rect: Rect,
     val startTime: Long,
     val endTime: Long
 ) {
     val text: String = spans.joinToString("") { it.text }
 }
 
+data class Rect(
+    var x: Float,
+    var y: Float,
+    var width: Float,
+    var height: Float,
+)
+
+data class LyricSpanPart(
+    val text: String,
+    val rect: Rect,
+)
+
 data class LyricSpan(
     val text: String,
-    val parts: List<String>,
+    val rect: Rect,
+    val parts: List<LyricSpanPart>,
+    var partsInitialized: Boolean,
     val startTime: Long,
     val endTime: Long,
     val isFullLine: Boolean

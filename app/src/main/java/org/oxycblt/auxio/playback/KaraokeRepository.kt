@@ -57,6 +57,8 @@ class KaraokeRepository @Inject constructor(
      * @return A [KaraokeFiles] object containing the URIs, or null if not found.
      */
     suspend fun getKaraokeFiles(song: Song): KaraokeFiles? = withContext(Dispatchers.IO) {
+        L.d("Checking karaoke files for ${song.name.raw}")
+
         val path = song.path
         val fileName = path.name ?: return@withContext null
         if (!fileName.contains(".")) return@withContext null

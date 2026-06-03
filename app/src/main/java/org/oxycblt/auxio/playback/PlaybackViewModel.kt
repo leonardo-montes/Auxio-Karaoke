@@ -186,12 +186,50 @@ constructor(
         // React to song changes by loading lyrics and checking for karaoke files
         viewModelScope.launch {
             song.collectLatest { song ->
+                //L.d("AUXIOKE: Song changed, updating lyrics and karaoke files")
                 releaseKaraokePlayers()
-                if (song != null) {
-                    _lyrics.value = lyricsRepository.loadLyrics(song)
-                    _hasKaraokeFiles.value = karaokeRepository.hasKaraokeFiles(song)
+                //_lyrics.value = if (showLyrics.value && song != null) lyricsRepository.loadLyrics(song) else null
+                //_hasKaraokeFiles.value = if (showKaraoke.value && song != null) karaokeRepository.hasKaraokeFiles(song) else false
+            }
+        }
+
+        viewModelScope.launch {
+            // Combine showLyrics and song flows to react to changes in either
+            combine(showLyrics, song) { isVisible, currentSong ->
+                if (isVisible && currentSong != null) {
+                    // Return the song to load lyrics for
+                    currentSong
+                } else {
+                    null
+                }
+            }.collectLatest { songToLoad ->
+                if (songToLoad != null) {
+                    // Load lyrics asynchronously
+                    _lyrics.value = lyricsRepository.loadLyrics(songToLoad)
                 } else {
                     _lyrics.value = null
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            // Combine showKaraoke and song flows to react to changes in either
+            combine(showKaraoke, song) { isVisible, currentSong ->
+                if (isVisible && currentSong != null) {
+                    // Return the song to load lyrics for
+                    currentSong
+                } else {
+                    null
+                }
+            }.collectLatest { songToLoad ->
+                releaseKaraokePlayers()
+                L.d("AUXIOKE: Song changed, updating karaoke files")
+                if (songToLoad != null) {
+                    _hasKaraokeFiles.value = karaokeRepository.hasKaraokeFiles(songToLoad)
+                    if (_hasKaraokeFiles.value) {
+                        setupKaraokeTracks()
+                    }
+                } else {
                     _hasKaraokeFiles.value = false
                 }
             }
@@ -200,6 +238,7 @@ constructor(
         // NEW: Add this reactive bridge to handle muting the main track
         viewModelScope.launch {
             isKaraokeActive.collectLatest { active ->
+                L.d("AUXIOKE: Karaoke state changed, updating player state (active: $active)")
                 if (active) {
                     playbackManager.setVolume(0f)
                     setupKaraokeTracks()
@@ -216,6 +255,7 @@ constructor(
                 playing to active
             }.collectLatest { (playing, active) ->
                 if (active) {
+                    L.d("AUXIOKE: Playing state changed, updating player state")
                     if (playing) {
                         vocalsPlayer?.play()
                         accompanimentPlayer?.play()
@@ -232,6 +272,7 @@ constructor(
             combine(vocalsVolume, vocalsEnabled, isKaraokeActive) { vol, enabled, active ->
                 if (active && enabled) vol / 100f else 0f
             }.collectLatest { targetVol ->
+                L.d("AUXIOKE: Updating vocals volume")
                 vocalsPlayer?.volume = targetVol
             }
         }
@@ -241,6 +282,7 @@ constructor(
             combine(accompanimentVolume, accompanimentEnabled, isKaraokeActive) { vol, enabled, active ->
                 if (active && enabled) vol / 100f else 0f
             }.collectLatest { targetVol ->
+                L.d("AUXIOKE: Updating accompaniment volume")
                 accompanimentPlayer?.volume = targetVol
             }
         }
@@ -250,6 +292,7 @@ constructor(
     private var accompanimentPlayer: ExoPlayer? = null
 
     fun setupKaraokeTracks() {
+        L.d("AUXIOKE: Setting up karaoke tracks")
         val currentSong = _song.value ?: return
 
         viewModelScope.launch {
@@ -277,17 +320,18 @@ constructor(
             // Get the current position of the main (muted) track
             val currentPos = playbackManager.progression.calculateElapsedPositionMs() // Convert ds to ms
 
-            vocalsPlayer?.seekTo(currentPos)
-            accompanimentPlayer?.seekTo(currentPos)
-
             if (_isPlaying.value) {
                 vocalsPlayer?.play()
                 accompanimentPlayer?.play()
             }
+
+            vocalsPlayer?.seekTo(currentPos)
+            accompanimentPlayer?.seekTo(currentPos)
         }
     }
 
     private fun releaseKaraokePlayers() {
+        L.d("AUXIOKE: Releasing karaoke players")
         vocalsPlayer?.release()
         vocalsPlayer = null
         accompanimentPlayer?.release()
@@ -340,14 +384,15 @@ constructor(
 
         // Sync stem positions if they are active
         if (isKaraokeActive.value) {
+            L.d("AUXIOKE: Updating karaoke positions")
             vocalsPlayer?.let { vPlayer ->
                 // If drift > 100ms, force re-sync
-                if (abs(vPlayer.currentPosition - mainPosMs) > 100) {
+                if (abs(vPlayer.currentPosition - mainPosMs) > 300) {
                     vPlayer.seekTo(mainPosMs)
                 }
             }
             accompanimentPlayer?.let { aPlayer ->
-                if (abs(aPlayer.currentPosition - mainPosMs) > 100) {
+                if (abs(aPlayer.currentPosition - mainPosMs) > 300) {
                     aPlayer.seekTo(mainPosMs)
                 }
             }
@@ -362,12 +407,13 @@ constructor(
                     val currentMs = progression.calculateElapsedPositionMs()
                     _positionDs.value = currentMs.msToDs()
 
-                    if (isKaraokeActive.value) {
+                    if (isKaraokeActive.value && _isPlaying.value) {
+                        L.d("AUXIOKE: Updating karaoke positions")
                         vocalsPlayer?.let { v ->
-                            if (abs(v.currentPosition - currentMs) > 150) v.seekTo(currentMs)
+                            if (abs(v.currentPosition - currentMs) > 300) v.seekTo(currentMs)
                         }
                         accompanimentPlayer?.let { a ->
-                            if (abs(a.currentPosition - currentMs) > 150) a.seekTo(currentMs)
+                            if (abs(a.currentPosition - currentMs) > 300) a.seekTo(currentMs)
                         }
                     }
 
@@ -794,43 +840,43 @@ constructor(
 
     /** Toggle [showLyrics] (ex. from on to off) */
     fun toggleLyrics() {
-        L.d("Toggling lyrics state")
+        L.d("AUXIOKE: Toggling lyrics state")
         _showLyrics.value = !_showLyrics.value
     }
 
     /** Toggle [showKaraoke] (ex. from on to off) */
     fun toggleKaraoke() {
-        L.d("Toggling karaoke state")
+        L.d("AUXIOKE: Toggling karaoke state")
         _showKaraoke.value = !_showKaraoke.value
     }
 
     /** Toggle [showCamera] (ex. from on to off) */
     fun toggleCamera() {
-        L.d("Toggling camera state")
+        L.d("AUXIOKE: Toggling camera state")
         _showCamera.value = !_showCamera.value
     }
 
     /** Toggle [vocalsEnabled] (ex. from on to off) */
     fun toggleVocals() {
-        L.d("Toggling vocals enabled state")
+        L.d("AUXIOKE: Toggling vocals enabled state")
         _vocalsEnabled.value = !_vocalsEnabled.value
     }
 
     /** Toggle [accompanimentEnabled] (ex. from on to off) */
     fun toggleAccompaniment() {
-        L.d("Toggling accompaniment enabled state")
+        L.d("AUXIOKE: Toggling accompaniment enabled state")
         _accompanimentEnabled.value = !_accompanimentEnabled.value
     }
 
     /** Set [vocalsVolume] (0-100) */
     fun setVocalsVolume(volume: Int) {
-        L.d("Setting vocals volume to $volume")
+        L.d("AUXIOKE: Setting vocals volume to $volume")
         _vocalsVolume.value = volume.coerceIn(0, 100)
     }
 
     /** Set [accompanimentVolume] (0-100) */
     fun setAccompanimentVolume(volume: Int) {
-        L.d("Setting accompaniment volume to $volume")
+        L.d("AUXIOKE: Setting accompaniment volume to $volume")
         _accompanimentVolume.value = volume.coerceIn(0, 100)
     }
 

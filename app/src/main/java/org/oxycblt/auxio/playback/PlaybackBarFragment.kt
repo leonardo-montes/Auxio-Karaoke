@@ -83,6 +83,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         binding.karaokeVocalsVolume.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
+                L.d("AUXIOKE: Updating vocals volume")
                 playbackModel.setVocalsVolume(slider.value.toInt())
             }
         })
@@ -90,6 +91,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         binding.karaokeAccompanimentVolume.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
+                L.d("AUXIOKE: Updating accompaniment volume")
                 playbackModel.setAccompanimentVolume(slider.value.toInt())
             }
         })
@@ -125,7 +127,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateKaraokeVisibility(showKaraoke: Boolean) {
-        //L.e("karaoke is $showKaraoke")
+        L.d("AUXIOKE: karaoke is $showKaraoke")
+
         val binding = requireBinding()
         binding.playbackKaraokeContainer.visibility = if (showKaraoke) View.VISIBLE else View.GONE
         binding.actionShowKaraoke.apply {
@@ -143,7 +146,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateLyricsVisibility(showLyrics: Boolean) {
-        L.e("lyrics is $showLyrics")
+        L.e("AUXIOKE: lyrics is $showLyrics")
+
         val binding = requireBinding()
         binding.playbackLyrics.visibility = if (showLyrics) View.VISIBLE else View.GONE
         binding.playbackLyricsBackground.visibility = if (showLyrics) View.VISIBLE else View.GONE
@@ -160,6 +164,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateVocalsState(enabled: Boolean) {
+        L.d("AUXIOKE: vocals are $enabled")
+
         val binding = requireBinding()
         binding.karaokeVocalsToggle.icon?.alpha = if (enabled) 255 else 128
         binding.karaokeVocalsVolume.alpha = if (enabled) 1.0f else 0.5f
@@ -167,6 +173,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateAccompanimentState(enabled: Boolean) {
+        L.d("AUXIOKE: accompaniment are $enabled")
+
         val binding = requireBinding()
         binding.karaokeAccompanimentToggle.icon?.alpha = if (enabled) 255 else 128
         binding.karaokeAccompanimentVolume.alpha = if (enabled) 1.0f else 0.5f
@@ -191,6 +199,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         requireBinding().playbackPlayPause.isActivated = isPlaying
 
         // START or STOP the high-frequency fluid timer
+        L.d("AUXIOKE: Lyrics animation is $isPlaying")
         val binding = requireBinding()
         if (isPlaying) {
             binding.playbackLyrics.startAnimation(true)
@@ -204,7 +213,8 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
         binding.playbackProgressBar.progress = positionDs.toInt()
 
         val positionMs = positionDs.dsToMs() + 200 // 200ms offset
-        if (playbackModel.lyrics.value != null) {
+        if (playbackModel.lyrics.value != null && playbackModel.showLyrics.value) {
+            L.d("AUXIOKE: Updating lyrics position to $positionMs")
             binding.playbackLyrics.setPosition(positionMs)
             if (!binding.playbackPlayPause.isActivated) {
                 binding.playbackLyrics.startAnimation(false)
@@ -213,6 +223,7 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
     }
 
     private fun updateLyrics(lyrics: TimedLyrics?) {
+        L.d("AUXIOKE: Updating lyrics (isNull? ${lyrics == null})")
         val binding = requireBinding()
         if (lyrics != null) {
             binding.playbackLyrics.setTimedLyrics(lyrics)
